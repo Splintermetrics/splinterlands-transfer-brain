@@ -1,0 +1,59 @@
+const {chromium}=require('playwright');
+const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const root=path.resolve(__dirname,'..');
+const data=JSON.parse(fs.readFileSync(path.join(root,'data/graph.json'),'utf8'));
+const server=http.createServer((req,res)=>{
+  const file=path.join(root,decodeURIComponent(new URL(req.url,'http://localhost').pathname).replace(/^\//,'')||'index.html');
+  if(!file.startsWith(root+path.sep)){res.writeHead(403).end();return;}
+  fs.readFile(file,(error,body)=>{if(error){res.writeHead(404).end();return;}
+    res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':file.endsWith('.json')?'application/json':'text/html');
+    res.end(body);
+  });
+});
+(async()=>{
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  const browser=await chromium.launch({headless:true,...(process.env.TEST_BROWSER_CHANNEL?{channel:process.env.TEST_BROWSER_CHANNEL}:{})});
+  try{
+    const page=await browser.newPage({viewport:{width:1440,height:1100},colorScheme:'dark'});
+    const errors=[];page.on('pageerror',e=>errors.push(e.message));
+    const url=process.env.SITE_URL||'http://127.0.0.1:'+server.address().port;
+    await page.goto(url);
+    await page.waitForSelector('#splinterlands-brain:not(.loading)');
+    assert.equal(await page.locator('#brain-player').getAttribute('placeholder'),'Enter a Splinterlands username');
+    assert.equal(await page.locator('#brain-stat-gifts').textContent(),data.gifts.toLocaleString('en-US'));
+    assert.equal(await page.locator('#brain-play').textContent(),'Pause transfers');
+    await page.locator('#brain-play').click();
+    const name=process.env.TEST_PLAYER||'doombot75';
+    const node=data.nodes.find(n=>n[0]===name)||data.nodes.find(n=>n[4]>0&&n[5]>0);
+    await page.locator('#brain-player').fill('@'+node[0].toUpperCase());
+    await page.locator('#brain-search button[type=submit]').click();
+    await page.waitForTimeout(1100);
+    const selection=await page.locator('#brain-selection').textContent();
+    assert(selection.includes(node[0]));
+    assert(selection.includes(node[4].toLocaleString('en-US')+' incoming'));
+    assert(selection.includes(node[5].toLocaleString('en-US')+' outgoing'));
+    const sums=await page.locator('#brain-rows tr').evaluateAll(rows=>rows.reduce((a,r)=>[a[0]+Number(r.children[1].textContent.replace(/,/g,'')),a[1]+Number(r.children[2].textContent.replace(/,/g,''))],[0,0]));
+    assert.deepEqual(sums,[node[4],node[5]]);
+    const colours=await page.evaluate(()=>[getComputedStyle(document.querySelector('#brain-key-in')).color,getComputedStyle(document.querySelector('#brain-key-out')).color]);
+    assert.notEqual(colours[0],colours[1]);
+    await page.locator('#brain-day').fill('29');await page.locator('#brain-day').dispatchEvent('input');
+    assert.equal(await page.locator('#brain-date').textContent(),data.end);
+    await page.locator('#brain-play').click();assert.equal(await page.locator('#brain-play').textContent(),'Pause transfers');
+    await page.locator('#brain-play').click();
+    fs.mkdirSync(path.join(root,'test-results'),{recursive:true});
+    await page.screenshot({path:path.join(root,'test-results/desktop.png'),fullPage:true});
+    await page.locator('#brain-player').fill('not-a-player-in-this-data');
+    await page.locator('#brain-search button[type=submit]').click();
+    assert((await page.locator('#brain-message').textContent()).includes('no recorded'));
+    await page.locator('#brain-overview').click();
+    assert(await page.locator('#brain-connections').isHidden());
+    await page.setViewportSize({width:390,height:1000});
+    await page.emulateMedia({colorScheme:'light',reducedMotion:'reduce'});
+    await page.waitForTimeout(200);
+    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+    await page.locator('#brain-player').fill(node[0]);await page.locator('#brain-search button[type=submit]').click();
+    await page.screenshot({path:path.join(root,'test-results/mobile.png'),fullPage:true});
+    assert.deepEqual(errors,[]);
+    console.log('Browser checks passed: search, totals, direction colours, replay, missing player, reset, mobile and reduced motion.');
+  }finally{await browser.close();server.close();}
+})().catch(error=>{console.error(error);server.close();process.exitCode=1});
