@@ -53,7 +53,19 @@ const server=http.createServer((req,res)=>{
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
     await page.locator('#brain-player').fill(node[0]);await page.locator('#brain-search button[type=submit]').click();
     await page.screenshot({path:path.join(root,'test-results/mobile.png'),fullPage:true});
+    const lightCanvas=await page.locator('#brain-canvas').evaluate(canvas=>canvas.toDataURL());
+    await page.getByRole('button',{name:'Switch to dark mode'}).click();
+    await page.waitForFunction(()=>getComputedStyle(document.documentElement).colorScheme==='dark');
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    assert.notEqual(await page.locator('#brain-canvas').evaluate(canvas=>canvas.toDataURL()),lightCanvas,'Canvas must redraw in the chosen theme');
+    await page.screenshot({path:path.join(root,'test-results/dark-mode.png'),fullPage:true});
+    await page.reload();
+    await page.waitForSelector('#splinterlands-brain:not(.loading)');
+    assert.equal(await page.evaluate(()=>getComputedStyle(document.documentElement).colorScheme),'dark','Choice survives reload on a light device');
+    await page.getByRole('button',{name:'Switch to light mode'}).focus();
+    await page.keyboard.press('Enter');
+    assert.equal(await page.evaluate(()=>getComputedStyle(document.documentElement).colorScheme),'light');
     assert.deepEqual(errors,[]);
-    console.log('Browser checks passed: search, totals, direction colours, replay, missing player, reset, mobile and reduced motion.');
+    console.log('Browser checks passed: search, totals, direction colours, replay, mobile, reduced motion, theme switching, canvas redraw, saved preference and keyboard control.');
   }finally{await browser.close();server.close();}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1});

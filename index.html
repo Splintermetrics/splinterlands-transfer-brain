@@ -6,6 +6,7 @@
 <meta name="description" content="Explore the last 30 complete days of Splinterlands card gifts. Find a player, follow incoming and outgoing transfers, and replay daily activity.">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'">
 <title>Splinterlands Transfer Brain | Splintermetrics</title>
+<script src="assets/theme.js"></script>
 <link rel="stylesheet" href="assets/site.css">
 <script src="assets/brain.js" defer></script>
 </head>
@@ -14,7 +15,10 @@
   <header class="page-header">
     <div><p class="eyebrow">SPLINTERMETRICS / CARD NETWORK</p><h1>Transfer brain<span class="title-dot">.</span></h1>
       <p class="intro">Thirty days of card gifts. One connected world.</p></div>
-    <div class="freshness"><span class="status-dot"></span><span id="brain-updated">Loading the latest snapshot…</span></div>
+    <div class="header-actions">
+      <button class="btn theme-toggle" id="theme-toggle" type="button" aria-label="Switch to dark mode"><span class="theme-icon" aria-hidden="true">☾</span> <span class="theme-label">Dark mode</span></button>
+      <div class="freshness"><span class="status-dot"></span><span id="brain-updated">Loading the latest snapshot…</span></div>
+    </div>
   </header>
   <div class="summary-bar">
     <div class="period"><span class="label">Rolling 30-day window</span><span id="brain-period">Loading dates…</span></div>
