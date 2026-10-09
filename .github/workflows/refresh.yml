@@ -1,0 +1,69 @@
+name: Refresh transfer brain
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main, 'codex/**']
+    paths-ignore: ['README.md']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: transfer-brain-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check-and-refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check collection safeguards
+        run: python -m unittest discover -s tests -v
+      - name: Check JavaScript
+        run: node --check assets/brain.js
+      - name: Install browser test runner
+        run: |
+          npm install --no-save --package-lock=false playwright@1.62.1
+          npx playwright install --with-deps chromium
+      - name: Collect thirty complete UTC days
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: |
+          python scripts/collect_transfers.py --days 30 --output .refresh/source
+          python scripts/build_graph.py
+      - name: Validate published graph
+        run: |
+          python -c "import sys,json;sys.path.insert(0,'scripts');from build_graph import validate;validate(json.load(open('data/graph.json')))"
+      - name: Check search, direction colours, replay and mobile layout
+        run: node tests/browser.cjs
+      - name: Save refreshed graph and publish Pages
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/publish_pages.py
+      - name: Keep refresh evidence and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: refresh-evidence
+          path: |
+            test-results/
+            .refresh/source/summary.json
+          retention-days: 7
+          if-no-files-found: ignore
