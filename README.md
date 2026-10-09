@@ -9,6 +9,11 @@ player; amber solid links show **outgoing** gifts. Arrowheads and replay pulses
 follow sender to recipient. Purple neighbours send and receive. The whole
 network uses neutral blue. Account positions remain stable between updates.
 
+After selecting a player, use **Connection depth** to choose one or two hops.
+Two hops includes connections of direct neighbours, following gifts in either
+direction. Other links inside this neighbourhood are blue. The camera fits the
+expanded view; the table and incoming/outgoing totals remain direct gifts.
+
 ## Automatic refresh
 
 GitHub Actions runs daily at **02:17 UTC** (03:17 during British Summer Time,

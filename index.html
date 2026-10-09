@@ -35,10 +35,19 @@
       <button class="btn btn-primary" type="submit">Find player <span aria-hidden="true">↗</span></button>
       <button class="btn btn-secondary" id="brain-overview" type="button">Whole network</button>
     </form>
+    <div class="neighbourhood-controls">
+      <label for="brain-hops">Connection depth</label>
+      <select id="brain-hops" disabled>
+        <option value="1">1 hop · direct connections</option>
+        <option value="2">2 hops · connections of connections</option>
+      </select>
+      <span id="brain-hop-help">Find a player to explore their neighbourhood.</span>
+    </div>
     <div id="brain-message" role="status" aria-live="polite"></div>
     <div class="legend">
       <span id="brain-key-in" class="incoming"><span class="line-key dashed"></span>↓ Incoming</span>
       <span id="brain-key-out" class="outgoing"><span class="line-key"></span>↑ Outgoing</span>
+      <span id="brain-key-second" class="second-hop" hidden><span class="line-key"></span>2-hop links</span>
       <span id="brain-legend-note">Select a player to reveal incoming and outgoing transfers.</span>
     </div>
     <div id="brain-stage">
@@ -57,7 +66,7 @@
   <section class="selection-panel">
     <div id="brain-selection" aria-live="polite">Loading players…</div>
     <details id="brain-connections" hidden>
-      <summary>Player connections <span>30-day totals</span></summary>
+      <summary>Direct player connections <span>30-day totals</span></summary>
       <div class="table-responsive"><table><thead><tr><th scope="col">Player</th><th scope="col" class="incoming">↓ Incoming cards</th><th scope="col" class="outgoing">↑ Outgoing cards</th><th scope="col">Gifts</th></tr></thead><tbody id="brain-rows"></tbody></table></div>
     </details>
   </section>

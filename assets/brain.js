@@ -27,17 +27,17 @@ const updated=DATA.updated_at?new Date(DATA.updated_at):new Date(DATA.snapshot+'
 q('brain-updated').textContent=DATA.updated_at?`Updated ${updated.toLocaleString(undefined,{timeZone:'UTC',dateStyle:'medium',timeStyle:'short'})} UTC · refreshes daily`:`Snapshot ${DATA.snapshot} · refreshes daily`;
 if(Date.now()-updated.getTime()>48*60*60*1000){q('brain-updated').textContent+=' · refresh delayed';q('brain-updated').classList.add('stale');}
 const reduced=matchMedia('(prefers-reduced-motion: reduce)');
-let selected=-1,focus=new Set(),camera={x:0,y:0,k:1},transition=null,w=600,h=500,scale=240,dpr=1,day=0,playing=false,phase=0,last=0,raf=0,dirty=true,colors={},hover=-1,pointer=null,visible=true;
+let selected=-1,focus=new Set(),depth=new Map(),hops=1,camera={x:0,y:0,k:1},transition=null,w=600,h=500,scale=240,dpr=1,day=0,playing=false,phase=0,last=0,raf=0,dirty=true,colors={},hover=-1,pointer=null,visible=true;
 function resolveColor(name){const probe=document.createElement('span');probe.style.color=`var(${name})`;root.append(probe);const color=getComputedStyle(probe).color;probe.remove();return color;}
 function theme(){colors={fg:resolveColor('--foreground'),base:resolveColor('--background'),soft:resolveColor('--muted-foreground'),out:resolveColor('--outgoing'),in:resolveColor('--incoming'),neutral:resolveColor('--network'),both:resolveColor('--both'),border:resolveColor('--border')};dirty=true;requestDraw();}
 function point(n){return {x:w/2+(n.x-camera.x)*scale*camera.k,y:h/2+(n.y-camera.y)*scale*camera.k};}
 function world(p){return {x:(p.x-w/2)/(scale*camera.k)+camera.x,y:(p.y-h/2)/(scale*camera.k)+camera.y};}
 function edgePoints(e){const a=point(nodes[e.a]),b=point(nodes[e.b]);if(e.a===e.b)return {a,b,c:{x:a.x+45,y:a.y-60}};const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1;const bend=Math.min(42,len*.16);return {a,b,c:{x:(a.x+b.x)/2-dy/len*bend,y:(a.y+b.y)/2+dx/len*bend}};}
 function edgePath(context,p){context.beginPath();context.moveTo(p.a.x,p.a.y);context.quadraticCurveTo(p.c.x,p.c.y,p.b.x,p.b.y);}
-function edgeColor(e){return selected<0?colors.neutral:e.b===selected?colors.in:colors.out;}
-function nodeColor(n){if(n.index===selected)return colors.fg;if(selected<0)return colors.neutral;const incoming=nodeEdges[selected].some(e=>e.a===n.index&&e.b===selected),outgoing=nodeEdges[selected].some(e=>e.b===n.index&&e.a===selected);return incoming&&outgoing?colors.both:incoming?colors.in:colors.out;}
+function edgeColor(e){return selected<0?colors.neutral:e.b===selected?colors.in:e.a===selected?colors.out:colors.neutral;}
+function nodeColor(n){if(n.index===selected)return colors.fg;if(selected<0||depth.get(n.index)===2)return colors.neutral;const incoming=nodeEdges[selected].some(e=>e.a===n.index&&e.b===selected),outgoing=nodeEdges[selected].some(e=>e.b===n.index&&e.a===selected);return incoming&&outgoing?colors.both:incoming?colors.in:colors.out;}
 function arrow(context,p,color){const t=.78,u=1-t,x=u*u*p.a.x+2*u*t*p.c.x+t*t*p.b.x,y=u*u*p.a.y+2*u*t*p.c.y+t*t*p.b.y;const angle=Math.atan2(2*u*(p.c.y-p.a.y)+2*t*(p.b.y-p.c.y),2*u*(p.c.x-p.a.x)+2*t*(p.b.x-p.c.x));context.save();context.translate(x,y);context.rotate(angle);context.fillStyle=color;context.beginPath();context.moveTo(5,0);context.lineTo(-4,-3);context.lineTo(-4,3);context.closePath();context.fill();context.restore();}
-function edgeFocused(e){return selected<0||e.a===selected||e.b===selected;}
+function edgeFocused(e){return selected<0||e.a===selected||e.b===selected||(hops===2&&focus.has(e.a)&&focus.has(e.b));}
 function paintBackground(){
 bg.setTransform(dpr,0,0,dpr,0,0);bg.clearRect(0,0,w,h);bg.lineCap='round';
 // Thin anatomical guides are a schematic silhouette, not additional links.
@@ -50,7 +50,7 @@ dirty=false;
 }
 function labels(){
 if(selected<0&&hover<0)return;
-const ids=selected>=0?[selected,...Array.from(focus).filter(i=>i!==selected)]:[hover];const placed=[];ctx.font='12px sans-serif';ctx.textBaseline='middle';
+const ids=selected>=0?[selected,...Array.from(focus).filter(i=>i!==selected).sort((a,b)=>(depth.get(a)-depth.get(b))||(nodes[b].degree-nodes[a].degree)).slice(0,49)]:[hover];const placed=[];ctx.font='12px sans-serif';ctx.textBaseline='middle';
 for(const id of ids){const n=nodes[id],p=point(n);if(p.x<8||p.x>w-8||p.y<8||p.y>h-8)continue;const tw=ctx.measureText(n.id).width+12;let x=Math.max(4,Math.min(w-tw-4,p.x-tw/2)),y=p.y+15;const rect={x,y:y-10,w:tw,h:20};if(id!==selected&&placed.some(r=>rect.x<r.x+r.w+4&&rect.x+rect.w>r.x-4&&rect.y<r.y+r.h+4&&rect.y+rect.h>r.y-4))continue;if(y+10>h)y=p.y-17;
 placed.push({x,y:y-10,w:tw,h:20});ctx.globalAlpha=.94;ctx.fillStyle=colors.base;ctx.fillRect(x,y-10,tw,20);ctx.globalAlpha=1;ctx.fillStyle=colors.fg;ctx.fillText(n.id,x+6,y);}
 }
@@ -67,8 +67,25 @@ function updateDay(){dayControl.value=String(day);const date=new Date(DATA.start
 function moveCamera(to){if(reduced.matches){camera=to;transition=null;dirty=true;requestDraw();return;}transition={from:{...camera},to,start:performance.now(),duration:1000};last=0;requestDraw();}
 function populateConnections(){const rows=q('brain-rows');rows.replaceChildren();const map=new Map();for(const e of nodeEdges[selected]){const other=e.a===selected?e.b:e.a;const r=map.get(other)||{i:other,incoming:0,outgoing:0,gifts:0};if(e.b===selected)r.incoming+=e.cards;if(e.a===selected)r.outgoing+=e.cards;r.gifts+=e.gifts;map.set(other,r);}
 Array.from(map.values()).sort((a,b)=>(b.incoming+b.outgoing)-(a.incoming+a.outgoing)).forEach(r=>{const tr=document.createElement('tr'),td=document.createElement('td'),button=document.createElement('button');button.className='btn btn-ghost';button.type='button';button.textContent=nodes[r.i].id;button.addEventListener('click',()=>selectPlayer(r.i));td.append(button);tr.append(td);for(const [column,value] of [r.incoming,r.outgoing,r.gifts].entries()){const cell=document.createElement('td');cell.className='text-end tabular-nums '+(column===0?'incoming':column===1?'outgoing':'');cell.textContent=value.toLocaleString();tr.append(cell);}rows.append(tr);});}
-function selectPlayer(id){selected=id;q('brain-legend-note').textContent='Direction is relative to the selected player. Purple points send and receive.';focus=new Set([id,...adjacency[id]]);input.value=nodes[id].id;q('brain-message').textContent='';q('brain-selection').replaceChildren();for(const [text,cls] of [[nodes[id].id+' · ',''],['↓ '+nodes[id].incoming.toLocaleString()+' incoming','incoming'],[' · ',''],['↑ '+nodes[id].outgoing.toLocaleString()+' outgoing','outgoing'],[' · '+adjacency[id].size+' connected players','']]){const span=document.createElement('span');span.textContent=text;span.className=cls;q('brain-selection').append(span);}q('brain-connections').hidden=false;q('brain-connections').open=true;populateConnections();dirty=true;hover=-1;tip.hidden=true;moveCamera({x:nodes[id].x,y:nodes[id].y,k:w<480?3.2:3.7});}
-function overview(){selected=-1;q('brain-legend-note').textContent='Select a player to reveal incoming and outgoing transfers.';focus.clear();input.value='';q('brain-message').textContent='';q('brain-selection').textContent='All players · drag to pan, tap a point to explore';q('brain-connections').hidden=true;dirty=true;moveCamera({x:0,y:0,k:1});}
+function updateNeighbourhood(){
+depth=new Map([[selected,0]]);let frontier=[selected];
+for(let hop=1;hop<=hops;hop++){const next=[];for(const id of frontier){for(const other of adjacency[id]){if(!depth.has(other)){depth.set(other,hop);next.push(other);}}}frontier=next;}
+focus=new Set(depth.keys());q('brain-hops').disabled=false;q('brain-key-second').hidden=hops!==2;
+q('brain-hop-help').textContent=hops===2?'Includes players up to two transfers away, in either direction.':'Includes gifts directly to or from this player.';
+q('brain-legend-note').textContent=hops===2?'Cyan/amber are direct gifts; blue shows other links within two hops. The table shows direct transfers.':'Direction is relative to the selected player. Purple points send and receive.';
+q('brain-selection').replaceChildren();
+for(const [text,cls] of [[nodes[selected].id+' · ',''],['↓ '+nodes[selected].incoming.toLocaleString()+' incoming','incoming'],[' · ',''],['↑ '+nodes[selected].outgoing.toLocaleString()+' outgoing','outgoing'],[' · '+adjacency[selected].size+' direct connections',''],[hops===2?' · '+(focus.size-1)+' players within 2 hops':'','']]){const span=document.createElement('span');span.textContent=text;span.className=cls;q('brain-selection').append(span);}
+canvas.setAttribute('aria-label',`Transfer neighbourhood of ${nodes[selected].id}: ${focus.size-1} other players within ${hops} ${hops===1?'hop':'hops'}. The table below shows direct gifts.`);
+dirty=true;hover=-1;tip.hidden=true;
+if(hops===1){moveCamera({x:nodes[selected].x,y:nodes[selected].y,k:w<480?3.2:3.7});return;}
+const xs=Array.from(focus,id=>nodes[id].x),ys=Array.from(focus,id=>nodes[id].y);
+const left=Math.min(...xs),right=Math.max(...xs),top=Math.min(...ys),bottom=Math.max(...ys);
+const padding=w<480?52:80;
+moveCamera({x:(left+right)/2,y:(top+bottom)/2,k:Math.max(.7,Math.min(3.7,(w-padding)/(scale*Math.max(.15,right-left)),(h-padding)/(scale*Math.max(.15,bottom-top))))});
+}
+function selectPlayer(id){selected=id;input.value=nodes[id].id;q('brain-message').textContent='';updateNeighbourhood();q('brain-connections').hidden=false;q('brain-connections').open=true;populateConnections();}
+function overview(){selected=-1;q('brain-legend-note').textContent='Select a player to reveal incoming and outgoing transfers.';focus.clear();depth.clear();input.value='';q('brain-message').textContent='';q('brain-selection').textContent='All players · drag to pan, tap a point to explore';q('brain-connections').hidden=true;q('brain-hops').disabled=true;q('brain-key-second').hidden=true;q('brain-hop-help').textContent='Find a player to explore their neighbourhood.';canvas.setAttribute('aria-label','Brain-shaped network of players and directed card gifts. Search a player to explore their neighbourhood.');dirty=true;moveCamera({x:0,y:0,k:1});}
+q('brain-hops').addEventListener('change',()=>{hops=Number(q('brain-hops').value)===2?2:1;if(selected>=0)updateNeighbourhood();});
 search.addEventListener('submit',event=>{event.preventDefault();const value=input.value.trim().replace(/^@/,'').toLowerCase();const id=index.get(value);if(id!==undefined){selectPlayer(id);return;}const matches=nodes.filter(n=>n.id.toLowerCase().startsWith(value));if(value&&matches.length===1){selectPlayer(matches[0].index);return;}q('brain-message').textContent=value?matches.length?`Choose a complete player name (${matches.length} matches).`:'That player has no recorded direct card gifts in this window.':'Enter a player name.';});
 q('brain-overview').addEventListener('click',overview);
 play.addEventListener('click',()=>{if(reduced.matches){q('brain-message').textContent='Reduced motion is enabled. Use the replay date slider to inspect daily totals.';return;}if(!playing&&day===29){day=0;phase=0;updateDay();}playing=!playing;play.textContent=playing?'Pause transfers':'Play transfers';last=0;requestDraw();});

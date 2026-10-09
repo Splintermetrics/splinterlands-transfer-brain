@@ -36,6 +36,16 @@ const server=http.createServer((req,res)=>{
     assert.deepEqual(sums,[node[4],node[5]]);
     const colours=await page.evaluate(()=>[getComputedStyle(document.querySelector('#brain-key-in')).color,getComputedStyle(document.querySelector('#brain-key-out')).color]);
     assert.notEqual(colours[0],colours[1]);
+    const directIds=new Set(data.edges.filter(e=>data.nodes[e[0]][0]===node[0]||data.nodes[e[1]][0]===node[0]).flatMap(e=>[e[0],e[1]]));
+    const twoHopIds=new Set([...directIds,...data.edges.filter(e=>directIds.has(e[0])||directIds.has(e[1])).flatMap(e=>[e[0],e[1]])]);
+    await page.locator('#brain-hops').selectOption('2');
+    await page.waitForTimeout(1100);
+    assert((await page.locator('#brain-selection').textContent()).includes((twoHopIds.size-1)+' players within 2 hops'));
+    assert(await page.locator('#brain-key-second').isVisible());
+    fs.mkdirSync(path.join(root,'test-results'),{recursive:true});
+    await page.screenshot({path:path.join(root,'test-results/two-hops.png'),fullPage:true});
+    await page.locator('#brain-hops').selectOption('1');
+    assert(await page.locator('#brain-key-second').isHidden());
     await page.locator('#brain-day').fill('29');await page.locator('#brain-day').dispatchEvent('input');
     assert.equal(await page.locator('#brain-date').textContent(),data.end);
     await page.locator('#brain-play').click();assert.equal(await page.locator('#brain-play').textContent(),'Pause transfers');
@@ -47,11 +57,16 @@ const server=http.createServer((req,res)=>{
     assert((await page.locator('#brain-message').textContent()).includes('no recorded'));
     await page.locator('#brain-overview').click();
     assert(await page.locator('#brain-connections').isHidden());
+    assert(await page.locator('#brain-hops').isDisabled());
     await page.setViewportSize({width:390,height:1000});
     await page.emulateMedia({colorScheme:'light',reducedMotion:'reduce'});
     await page.waitForTimeout(200);
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
     await page.locator('#brain-player').fill(node[0]);await page.locator('#brain-search button[type=submit]').click();
+    await page.locator('#brain-hops').selectOption('2');
+    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+    await page.screenshot({path:path.join(root,'test-results/two-hops-mobile.png'),fullPage:true});
+    await page.locator('#brain-hops').selectOption('1');
     await page.screenshot({path:path.join(root,'test-results/mobile.png'),fullPage:true});
     const lightCanvas=await page.locator('#brain-canvas').evaluate(canvas=>canvas.toDataURL());
     await page.getByRole('button',{name:'Switch to dark mode'}).click();
@@ -65,7 +80,23 @@ const server=http.createServer((req,res)=>{
     await page.getByRole('button',{name:'Switch to light mode'}).focus();
     await page.keyboard.press('Enter');
     assert.equal(await page.evaluate(()=>getComputedStyle(document.documentElement).colorScheme),'light');
+    const fixture={start:data.start,end:data.end,snapshot:data.snapshot,gifts:5,movements:5,
+      nodes:[['alpha',-.5,0,1,1,1],['beta',0,0,2,2,1],['gamma',.5,0,2,1,1],['delta',.7,.3,1,0,1],['island',-.7,.5,1,1,1]],
+      edges:[[0,1,1,1,data.start,data.start],[1,0,1,1,data.start,data.start],[2,1,1,1,data.start,data.start],[3,2,1,1,data.start,data.start],[4,4,1,1,data.start,data.start]],
+      daily:[[0,0,1,1],[0,1,1,1],[0,2,1,1],[0,3,1,1],[0,4,1,1]]};
+    await page.route('**/data/graph.json',route=>route.fulfill({json:fixture}));
+    await page.reload();await page.waitForSelector('#splinterlands-brain:not(.loading)');
+    await page.locator('#brain-player').fill('alpha');await page.locator('#brain-search button[type=submit]').click();
+    assert((await page.locator('#brain-canvas').getAttribute('aria-label')).includes('1 other players within 1 hop'));
+    await page.locator('#brain-hops').selectOption('2');
+    assert((await page.locator('#brain-canvas').getAttribute('aria-label')).includes('2 other players within 2 hops'),'Cycle must not duplicate the root or include a third-hop or disconnected player');
+    assert.deepEqual(await page.locator('#brain-rows tr td:first-child').allTextContents(),['beta'],'Direct-transfer table must stay direct');
+    await page.locator('#brain-rows button').click();
+    assert.equal(await page.locator('#brain-hops').inputValue(),'2');
+    assert((await page.locator('#brain-canvas').getAttribute('aria-label')).includes('3 other players within 2 hops'));
+    await page.locator('#brain-hops').selectOption('1');
+    assert((await page.locator('#brain-canvas').getAttribute('aria-label')).includes('2 other players within 1 hop'));
     assert.deepEqual(errors,[]);
-    console.log('Browser checks passed: search, totals, direction colours, replay, mobile, reduced motion, theme switching, canvas redraw, saved preference and keyboard control.');
+    console.log('Browser checks passed: two-hop counts, cycles, third-hop exclusion, direct totals, switching players/depth, search, replay, mobile and saved theme.');
   }finally{await browser.close();server.close();}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1});
