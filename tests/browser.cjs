@@ -16,6 +16,7 @@ const server=http.createServer((req,res)=>{
   try{
     const page=await browser.newPage({viewport:{width:1440,height:1100},colorScheme:'dark'});
     const errors=[];page.on('pageerror',e=>errors.push(e.message));
+    await page.route('https://api.splinterlands.com/cards/find?*',route=>route.fulfill({json:new URL(route.request().url()).searchParams.get('ids').split(',').map(uid=>({uid,player:'fixture-owner'}))}));
     const url=process.env.SITE_URL||'http://127.0.0.1:'+server.address().port;
     await page.goto(url);
     await page.waitForSelector('#splinterlands-brain:not(.loading)');

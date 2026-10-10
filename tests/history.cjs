@@ -14,6 +14,7 @@ try{
 const page=await browser.newPage({viewport:{width:1440,height:1100},colorScheme:'dark',reducedMotion:'reduce'}),errors=[];
 page.on('pageerror',e=>errors.push(e.message));
 const url=process.env.SITE_URL||'http://127.0.0.1:'+server.address().port;
+if(process.env.CHECK_LIVE_OWNERS!=='1')await page.route('https://api.splinterlands.com/cards/find?*',route=>route.fulfill({json:new URL(route.request().url()).searchParams.get('ids').split(',').map(uid=>({uid,player:'fixture-owner'}))}));
 await page.goto(url);await page.waitForSelector('#splinterlands-brain:not(.loading)');
 async function select(name){await page.locator('#brain-player').fill(name);await page.locator('#brain-search button[type=submit]').click();}
 const name=data.nodes.some(n=>n[0]==='animeboy09')?'animeboy09':data.nodes.find(n=>n[4]>0||n[5]>0)[0],shard=[...name].reduce((s,c)=>s+c.charCodeAt(0),0)%32;
@@ -24,7 +25,6 @@ assert.equal(await page.locator('#history-rows tr').count(),Math.min(25,liveHist
 assert.equal(await page.locator('#history-rows time').first().getAttribute('datetime'),liveHistory[0][0]);
 assert((await page.locator('#history-rows').textContent()).includes(liveHistory[0][4][0]));
 if(process.env.CHECK_LIVE_OWNERS==='1'){
- await page.locator('#history-rows .owner-check').first().click();
  await page.waitForFunction(()=>document.querySelector('.owner-status').textContent.includes('checked'),{},{timeout:30000});
  console.log('Live ownership API: '+await page.locator('.owner-status').first().textContent());
 }
@@ -47,20 +47,34 @@ const players={alpha:[incoming,...outgoing,self],beta:outgoing,gamma:[incoming]}
 await page.route('**/data/graph.json',route=>route.fulfill({json:fixture}));
 await page.route('**/data/history/*.json',route=>route.fulfill({json:{updated_at:'fixture',players}}));
 let lookups=0;
-await page.route('https://api.splinterlands.com/cards/find?*',route=>{lookups++;return route.fulfill({json:[{uid:'C1-1-A',player:'alpha'},{uid:'C1-1-B',player:'beta'},{uid:'C1-1-C',error:'Card not found.'}]});});
-await page.reload();await page.waitForSelector('#splinterlands-brain:not(.loading)');await select('alpha');await page.waitForSelector('#history-rows tr');
-assert.equal(lookups,0,'Owner checks must run only on request');
-await page.locator('#history-rows .owner-check').first().click();
+await page.route('https://api.splinterlands.com/cards/find?*',route=>{lookups++;return route.fulfill({json:new URL(route.request().url()).searchParams.get('ids').split(',').map(uid=>uid==='C1-1-C'?{uid,error:'Card not found.'}:{uid,player:uid==='C1-1-A'||uid==='C1-1-S'?'alpha':'beta'})});});
+await page.clock.install();await page.reload();await page.waitForSelector('#splinterlands-brain:not(.loading)');await select('alpha');await page.waitForSelector('#history-rows tr');
 await page.waitForFunction(()=>document.querySelector('.owner-status').textContent.includes('checked'));
-assert.equal(lookups,1);assert((await page.locator('.owner-status').first().textContent()).includes('1 still with recipient · 1 elsewhere · 1 unavailable'));
+assert.equal(await page.getByRole('button',{name:'Check owners',exact:true}).count(),0);
+assert.equal(lookups,1,'The visible page should use a single batched automatic lookup');assert((await page.locator('.owner-status').first().textContent()).includes('1 still with recipient · 1 elsewhere · 1 unavailable'));
+assert.deepEqual(await page.locator('#history-rows tr').first().locator('.current-owners button').allTextContents(),['alpha','beta']);
 assert((await page.locator('#history-rows tr').first().textContent()).includes('Now with beta'));
 await page.locator('#history-next').click();assert.equal(await page.locator('#history-rows tr').count(),7);
 assert((await page.locator('#history-rows tr').last().textContent()).includes('Self gift'));
+await page.waitForFunction(()=>![...document.querySelectorAll('.owner-status')].some(el=>el.textContent.includes('Loading')));
+assert.equal(lookups,2,'Only the new cards on the older page need a lookup');
 await page.locator('#history-direction').selectOption('in');assert.equal(await page.locator('#history-rows tr').count(),2);
 await page.locator('#history-account').selectOption('gamma');assert.equal(await page.locator('#history-rows tr').count(),1);
 await page.locator('#history-rows tr').first().getByRole('button',{name:'gamma',exact:true}).click();
 await page.waitForFunction(()=>document.querySelector('#history-status').textContent.startsWith('gamma:'));
 assert.equal(await page.locator('#history-rows tr').count(),1);
+assert.equal(lookups,2,'Filtering and selecting another player should reuse fresh owner results');
+await page.clock.fastForward(61000);
+await page.waitForFunction(()=>!document.querySelector('.owner-status').textContent.includes('Loading'));
+assert.equal(lookups,3,'Owners refresh automatically after a minute');
+await page.locator('#transfer-history > summary').click();await page.clock.fastForward(61000);
+assert.equal(lookups,3,'Collapsed history should not keep polling');
+await page.clock.resume();
+// Failed lookups must not imply cards are still with the recipient.
+await page.route('https://api.splinterlands.com/cards/find?*',route=>route.fulfill({status:503,body:'Temporarily unavailable'}));
+await page.reload();await page.waitForSelector('#splinterlands-brain:not(.loading)');await select('alpha');
+await page.waitForFunction(()=>document.querySelector('.owner-status')?.textContent.includes('Owner lookup unavailable'));
+assert.equal(await page.locator('.current-owners button').count(),0);
 // A stale history file must never be shown with a newer network.
 await page.route('**/data/history/*.json',route=>route.fulfill({json:{updated_at:'old',players}}));
 await page.reload();await page.waitForSelector('#splinterlands-brain:not(.loading)');await select('alpha');
@@ -68,6 +82,6 @@ await page.waitForFunction(()=>document.querySelector('#history-status').textCon
 assert.equal(await page.locator('#history-rows tr').count(),0);
 assert(await page.getByRole('button',{name:'Reload latest snapshot'}).isVisible());
 assert.deepEqual(errors,[]);
-console.log('History checks passed: real gift totals, dates/card IDs, themes/mobile, filters/pagination, self gifts, account navigation, live owner states and snapshot mismatch.');
+console.log('History checks passed: automatic batched owners, cache reuse, minute refresh, collapsed pause, failures, real gifts, filters/pagination, themes/mobile and snapshot mismatch.');
 }finally{await browser.close();server.close();}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1;});

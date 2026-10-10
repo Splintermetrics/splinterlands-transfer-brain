@@ -14,10 +14,12 @@ The **Card transfer history** beneath the connection totals lists individual
 gifts newest first, with UTC times, sender/recipient accounts, card names and
 card IDs. Filter incoming/outgoing gifts or a particular connection and page
 through the results. Account buttons select that player in the brain.
-**Check owners** requests current ownership from Splinterlands, showing cards
+Current ownership loads automatically from Splinterlands for the displayed
+history page, showing account names and cards
 still with the recipient, now elsewhere, or unavailable (for example after
 combining or burning). Checks cover up to 100 cards per gift and report the
-check time. History follows the same daily 30-day snapshot as the network;
+check time. Batched lookups reuse results for one minute and refresh every
+minute while history is open. History follows the same daily 30-day snapshot as the network;
 market sales, rentals and delegations are not included.
 
 Two hops includes connections of direct neighbours, following gifts in either
@@ -36,7 +38,7 @@ Each refresh:
 3. Includes successful gifts only and reconciles payload/result card IDs.
 4. Rebuilds player, edge and daily replay totals and checks their agreement.
 5. Runs collection safeguards and real browser checks.
-6. Commits only the validated `data/graph.json` to main and explicitly requests
+6. Commits the validated graph and compressed history to main and explicitly requests
    a Pages build. It verifies that Pages publishes that commit.
 
 Keep GitHub Pages set to **Deploy from a branch → main → / (root)**. The
@@ -50,7 +52,7 @@ deployment is reported as a failed workflow, with the previous published
 revision still available. The page shows its update timestamp and a delay
 notice if the snapshot is over 48 hours old. Workflow evidence and screenshots
 are retained for seven days. Source records stay in the runner's temporary
-workspace; only the compact graph is committed.
+workspace; the compact graph and card-level gift history are committed.
 
 ## Scope
 
@@ -71,9 +73,11 @@ Python 3.12+ and Node.js 22+ are used in CI. Python uses the standard library.
 python -m unittest discover -s tests -v
 python scripts/collect_transfers.py --days 30 --output .refresh/source
 python scripts/build_graph.py
+python scripts/build_history.py
 npm install --no-save --package-lock=false playwright@1.62.1
 npx playwright install chromium
 node tests/browser.cjs
+node tests/history.cjs
 python -m http.server 8000
 ```
 
