@@ -9,9 +9,9 @@ function matchesDirection(r){const value=q('history-direction').value;return val
 function other(r){return r[2]===player?r[3]:r[2];}
 function cardName(uid){const match=/^[CG]\d+-(\d+)-/.exec(uid);return match?(data.card_names?.[match[1]]||'Card #'+match[1]):'Card';}
 function stopOwners(){ownerGeneration++;if(ownerController)ownerController.abort();ownerController=null;}
-function loadOwners(){
+function loadOwners(force=false){
 stopOwners();const token=ownerGeneration,views=ownerViews.slice(),controller=new AbortController();ownerController=controller;
-const ids=[...new Set(views.flatMap(view=>view.ids))].filter(uid=>!ownerCache.has(uid)||Date.now()-ownerCache.get(uid).checkedAt>=ownerMaxAge),pending=new Set(ids),failed=new Set();
+const ids=[...new Set(views.flatMap(view=>view.ids))].filter(uid=>force||!ownerCache.has(uid)||Date.now()-ownerCache.get(uid).checkedAt>=ownerMaxAge),pending=new Set(ids),failed=new Set();
 const state=uid=>pending.has(uid)?{loading:true}:failed.has(uid)?{error:true}:ownerCache.get(uid)||{error:true};
 const paint=()=>{if(token===ownerGeneration)views.forEach(view=>view.update(state));};paint();
 let cursor=0;
@@ -20,7 +20,7 @@ async function worker(){while(cursor<ids.length&&!controller.signal.aborted){con
  }catch(error){if(controller.signal.aborted)return;batch.forEach(uid=>{failed.add(uid);pending.delete(uid);});}
  paint();
 }}
-Promise.all(Array.from({length:Math.min(2,Math.ceil(ids.length/50))},worker)).catch(()=>{});
+Promise.all(Array.from({length:Math.min(2,Math.ceil(ids.length/50))},worker)).finally(()=>{if(token===ownerGeneration)ownerController=null;}).catch(()=>{});
 }
 function render(){
 stopOwners();ownerViews=[];
@@ -72,7 +72,7 @@ try{
 q('history-direction').addEventListener('change',()=>{page=0;render();});q('history-account').addEventListener('change',()=>{page=0;render();});
 q('history-prev').addEventListener('click',()=>{if(page>0){page--;render();}});q('history-next').addEventListener('click',()=>{page++;render();});
 q('history-retry').addEventListener('click',()=>{if(reloadNeeded)location.reload();else show(player);});
-setInterval(()=>{if(!document.hidden&&!q('transfer-history').hidden&&q('transfer-history').open&&ownerViews.length)loadOwners();},ownerMaxAge);
+setInterval(()=>{if(!ownerController&&!document.hidden&&!q('transfer-history').hidden&&q('transfer-history').open&&ownerViews.length)loadOwners(true);},ownerMaxAge);
 q('transfer-history').addEventListener('toggle',()=>{if(q('transfer-history').open&&!q('transfer-history').hidden&&ownerViews.length)loadOwners();});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!q('transfer-history').hidden&&q('transfer-history').open&&ownerViews.length)loadOwners();});
 return {show,hide(){requestId++;stopOwners();ownerViews=[];q('transfer-history').hidden=true;}};
