@@ -4,10 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Explore the last 30 complete days of Splinterlands card gifts. Find a player, follow incoming and outgoing transfers, and replay daily activity.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' https://api.splinterlands.com; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'">
 <title>Splinterlands Transfer Brain | Splintermetrics</title>
 <script src="assets/theme.js"></script>
 <link rel="stylesheet" href="assets/site.css">
+<script src="assets/history.js" defer></script>
 <script src="assets/brain.js" defer></script>
 </head>
 <body>
@@ -68,6 +69,19 @@
     <details id="brain-connections" hidden>
       <summary>Direct player connections <span>30-day totals</span></summary>
       <div class="table-responsive"><table><thead><tr><th scope="col">Player</th><th scope="col" class="incoming">↓ Incoming cards</th><th scope="col" class="outgoing">↑ Outgoing cards</th><th scope="col">Gifts</th></tr></thead><tbody id="brain-rows"></tbody></table></div>
+    </details>
+    <details id="transfer-history" hidden open>
+      <summary>Card transfer history <span>Newest first · UTC</span></summary>
+      <p class="history-note">Successful gifts in this 30-day window. Click an account to explore it. Check owners for a live lookup of up to 100 cards per gift; unavailable cards may have been combined or burned.</p>
+      <div class="history-controls">
+        <label for="history-direction">Direction<select id="history-direction"><option value="all">Incoming &amp; outgoing</option><option value="in">↓ Incoming gifts</option><option value="out">↑ Outgoing gifts</option></select></label>
+        <label for="history-account">Connection<select id="history-account"><option value="">All connections</option></select></label>
+      </div>
+      <p id="history-status" role="status" aria-live="polite"></p>
+      <button id="history-retry" class="btn" type="button" hidden>Retry history</button>
+      <div id="history-chips" class="history-chips" aria-label="Filter history by connection"></div>
+      <div class="table-responsive history-table"><table aria-label="Individual card gifts"><thead><tr><th scope="col">When</th><th scope="col">Direction</th><th scope="col">From → To</th><th scope="col">Cards</th><th scope="col">Current owner</th></tr></thead><tbody id="history-rows"></tbody></table></div>
+      <div class="history-pagination"><button id="history-prev" class="btn" type="button">← Newer</button><span id="history-page"></span><button id="history-next" class="btn" type="button">Older →</button></div>
     </details>
   </section>
   <footer>

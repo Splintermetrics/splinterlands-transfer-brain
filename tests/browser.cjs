@@ -68,11 +68,13 @@ const server=http.createServer((req,res)=>{
     await page.screenshot({path:path.join(root,'test-results/two-hops-mobile.png'),fullPage:true});
     await page.locator('#brain-hops').selectOption('1');
     await page.screenshot({path:path.join(root,'test-results/mobile.png'),fullPage:true});
+    await page.locator('#brain-canvas').scrollIntoViewIfNeeded();
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
     const lightCanvas=await page.locator('#brain-canvas').evaluate(canvas=>canvas.toDataURL());
     await page.getByRole('button',{name:'Switch to dark mode'}).click();
     await page.waitForFunction(()=>getComputedStyle(document.documentElement).colorScheme==='dark');
-    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
-    assert.notEqual(await page.locator('#brain-canvas').evaluate(canvas=>canvas.toDataURL()),lightCanvas,'Canvas must redraw in the chosen theme');
+    await page.locator('#brain-canvas').scrollIntoViewIfNeeded();
+    await page.waitForFunction(previous=>document.querySelector('#brain-canvas').toDataURL()!==previous,lightCanvas);
     await page.screenshot({path:path.join(root,'test-results/dark-mode.png'),fullPage:true});
     await page.reload();
     await page.waitForSelector('#splinterlands-brain:not(.loading)');

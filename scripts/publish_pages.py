@@ -21,7 +21,7 @@ def publish():
         raise RuntimeError("This refresh uses Pages publishing from main / (root); restore that source in Settings > Pages")
     subprocess.run(["git","config","user.name","github-actions[bot]"],check=True)
     subprocess.run(["git","config","user.email","41898282+github-actions[bot]@users.noreply.github.com"],check=True)
-    subprocess.run(["git","add","data/graph.json"],check=True)
+    subprocess.run(["git","add","data/"],check=True)
     if subprocess.run(["git","diff","--cached","--quiet"]).returncode:
         subprocess.run(["git","commit","-m","Refresh the rolling 30-day card-gift graph"],check=True)
         # No force push: a concurrent source change leaves the deployed snapshot intact.

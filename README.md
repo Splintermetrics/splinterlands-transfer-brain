@@ -10,6 +10,16 @@ follow sender to recipient. Purple neighbours send and receive. The whole
 network uses neutral blue. Account positions remain stable between updates.
 
 After selecting a player, use **Connection depth** to choose one or two hops.
+The **Card transfer history** beneath the connection totals lists individual
+gifts newest first, with UTC times, sender/recipient accounts, card names and
+card IDs. Filter incoming/outgoing gifts or a particular connection and page
+through the results. Account buttons select that player in the brain.
+**Check owners** requests current ownership from Splinterlands, showing cards
+still with the recipient, now elsewhere, or unavailable (for example after
+combining or burning). Checks cover up to 100 cards per gift and report the
+check time. History follows the same daily 30-day snapshot as the network;
+market sales, rentals and delegations are not included.
+
 Two hops includes connections of direct neighbours, following gifts in either
 direction. Other links inside this neighbourhood are blue. The camera fits the
 expanded view; the table and incoming/outgoing totals remain direct gifts.

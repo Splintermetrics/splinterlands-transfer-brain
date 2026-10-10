@@ -16,6 +16,7 @@ const canvas=q('brain-canvas'),ctx=canvas.getContext('2d'),stage=q('brain-stage'
 const off=document.createElement('canvas'),bg=off.getContext('2d');
 const nodes=DATA.nodes.map((n,i)=>({id:n[0],x:n[1],y:n[2],degree:n[3],incoming:n[4],outgoing:n[5],index:i}));
 const index=new Map(nodes.map(n=>[n.id.toLowerCase(),n.index]));
+const history=createTransferHistory(root,DATA,name=>{const id=index.get(name.toLowerCase());if(id!==undefined)selectPlayer(id);else q('brain-message').textContent=`${name} has no recorded direct card gifts in this window.`;});
 const edges=DATA.edges.map((e,i)=>({a:e[0],b:e[1],gifts:e[2],cards:e[3],first:e[4],last:e[5],index:i}));
 const adjacency=nodes.map(()=>new Set()),nodeEdges=nodes.map(()=>[]),daily=Array.from({length:30},()=>[]);
 edges.forEach(e=>{adjacency[e.a].add(e.b);adjacency[e.b].add(e.a);nodeEdges[e.a].push(e);if(e.a!==e.b)nodeEdges[e.b].push(e);});
@@ -55,14 +56,14 @@ for(const id of ids){const n=nodes[id],p=point(n);if(p.x<8||p.x>w-8||p.y<8||p.y>
 placed.push({x,y:y-10,w:tw,h:20});ctx.globalAlpha=.94;ctx.fillStyle=colors.base;ctx.fillRect(x,y-10,tw,20);ctx.globalAlpha=1;ctx.fillStyle=colors.fg;ctx.fillText(n.id,x+6,y);}
 }
 function drawFrame(now){
-raf=0;if(!visible)return;const dt=last?Math.min(.1,(now-last)/1000):0;last=now;
+raf=0;if(!visible&&!dirty)return;const dt=visible&&last?Math.min(.1,(now-last)/1000):0;last=now;
 if(transition){const t=Math.min(1,(now-transition.start)/transition.duration),s=1-Math.pow(1-t,3);camera={x:transition.from.x+(transition.to.x-transition.from.x)*s,y:transition.from.y+(transition.to.y-transition.from.y)*s,k:transition.from.k+(transition.to.k-transition.from.k)*s};dirty=true;if(t===1)transition=null;}
-if(playing){phase+=dt/2.6;if(phase>=1){phase=0;if(day<29){day++;updateDay();}else{playing=false;play.textContent='Replay transfers';}}}
+if(playing&&visible){phase+=dt/2.6;if(phase>=1){phase=0;if(day<29){day++;updateDay();}else{playing=false;play.textContent='Replay transfers';}}}
 if(dirty)paintBackground();ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.drawImage(off,0,0,off.width,off.height,0,0,w,h);
 if(playing&&!reduced.matches){for(let i=0;i<daily[day].length;i++){const signal=daily[day][i],e=edges[signal.edge];if(selected>=0&&!edgeFocused(e))continue;const p=edgePoints(e),t=(phase*1.25+(i*0.61803398875)%1)%1,one=1-t,x=one*one*p.a.x+2*one*t*p.c.x+t*t*p.b.x,y=one*one*p.a.y+2*one*t*p.c.y+t*t*p.b.y;if(x<-10||x>w+10||y<-10||y>h+10)continue;ctx.globalAlpha=.9;ctx.fillStyle=edgeColor(e);ctx.shadowColor=edgeColor(e);ctx.shadowBlur=10;ctx.beginPath();ctx.arc(x,y,1.8+Math.min(2,Math.log1p(signal.cards)*.25),0,Math.PI*2);ctx.fill();}ctx.shadowBlur=0;ctx.globalAlpha=1;}
-labels();if(playing||transition)requestDraw();
+labels();if(visible&&(playing||transition))requestDraw();
 }
-function requestDraw(){if(!raf&&visible)raf=requestAnimationFrame(drawFrame);}
+function requestDraw(){if(!raf&&(visible||dirty))raf=requestAnimationFrame(drawFrame);}
 function updateDay(){dayControl.value=String(day);const date=new Date(DATA.start+'T00:00:00Z');date.setUTCDate(date.getUTCDate()+day);q('brain-date').textContent=date.toISOString().slice(0,10);const gifts=daily[day].reduce((v,d)=>v+d.gifts,0),cards=daily[day].reduce((v,d)=>v+d.cards,0);q('brain-day-count').textContent=`${gifts.toLocaleString()} gifts · ${cards.toLocaleString()} card movements`;requestDraw();}
 function moveCamera(to){if(reduced.matches){camera=to;transition=null;dirty=true;requestDraw();return;}transition={from:{...camera},to,start:performance.now(),duration:1000};last=0;requestDraw();}
 function populateConnections(){const rows=q('brain-rows');rows.replaceChildren();const map=new Map();for(const e of nodeEdges[selected]){const other=e.a===selected?e.b:e.a;const r=map.get(other)||{i:other,incoming:0,outgoing:0,gifts:0};if(e.b===selected)r.incoming+=e.cards;if(e.a===selected)r.outgoing+=e.cards;r.gifts+=e.gifts;map.set(other,r);}
@@ -83,8 +84,8 @@ const left=Math.min(...xs),right=Math.max(...xs),top=Math.min(...ys),bottom=Math
 const padding=w<480?52:80;
 moveCamera({x:(left+right)/2,y:(top+bottom)/2,k:Math.max(.7,Math.min(3.7,(w-padding)/(scale*Math.max(.15,right-left)),(h-padding)/(scale*Math.max(.15,bottom-top))))});
 }
-function selectPlayer(id){selected=id;input.value=nodes[id].id;q('brain-message').textContent='';updateNeighbourhood();q('brain-connections').hidden=false;q('brain-connections').open=true;populateConnections();}
-function overview(){selected=-1;q('brain-legend-note').textContent='Select a player to reveal incoming and outgoing transfers.';focus.clear();depth.clear();input.value='';q('brain-message').textContent='';q('brain-selection').textContent='All players · drag to pan, tap a point to explore';q('brain-connections').hidden=true;q('brain-hops').disabled=true;q('brain-key-second').hidden=true;q('brain-hop-help').textContent='Find a player to explore their neighbourhood.';canvas.setAttribute('aria-label','Brain-shaped network of players and directed card gifts. Search a player to explore their neighbourhood.');dirty=true;moveCamera({x:0,y:0,k:1});}
+function selectPlayer(id){selected=id;input.value=nodes[id].id;q('brain-message').textContent='';updateNeighbourhood();q('brain-connections').hidden=false;q('brain-connections').open=true;populateConnections();history.show(nodes[id].id);}
+function overview(){selected=-1;history.hide();q('brain-legend-note').textContent='Select a player to reveal incoming and outgoing transfers.';focus.clear();depth.clear();input.value='';q('brain-message').textContent='';q('brain-selection').textContent='All players · drag to pan, tap a point to explore';q('brain-connections').hidden=true;q('brain-hops').disabled=true;q('brain-key-second').hidden=true;q('brain-hop-help').textContent='Find a player to explore their neighbourhood.';canvas.setAttribute('aria-label','Brain-shaped network of players and directed card gifts. Search a player to explore their neighbourhood.');dirty=true;moveCamera({x:0,y:0,k:1});}
 q('brain-hops').addEventListener('change',()=>{hops=Number(q('brain-hops').value)===2?2:1;if(selected>=0)updateNeighbourhood();});
 search.addEventListener('submit',event=>{event.preventDefault();const value=input.value.trim().replace(/^@/,'').toLowerCase();const id=index.get(value);if(id!==undefined){selectPlayer(id);return;}const matches=nodes.filter(n=>n.id.toLowerCase().startsWith(value));if(value&&matches.length===1){selectPlayer(matches[0].index);return;}q('brain-message').textContent=value?matches.length?`Choose a complete player name (${matches.length} matches).`:'That player has no recorded direct card gifts in this window.':'Enter a player name.';});
 q('brain-overview').addEventListener('click',overview);
@@ -99,7 +100,7 @@ canvas.addEventListener('pointercancel',()=>{pointer=null;});canvas.addEventList
 canvas.addEventListener('wheel',e=>{e.preventDefault();transition=null;const p=canvasPoint(e),before=world(p);camera.k=Math.max(.7,Math.min(12,camera.k*Math.exp(-e.deltaY*.0012)));const after=world(p);camera.x+=before.x-after.x;camera.y+=before.y-after.y;dirty=true;requestDraw();},{passive:false});
 function resize(){const nextW=Math.max(280,Math.floor(stage.getBoundingClientRect().width)),nextH=Math.max(420,Math.min(610,nextW*.79));const ratio=Math.min(2,window.devicePixelRatio||1);if(w===nextW&&h===nextH&&dpr===ratio)return;w=nextW;h=nextH;dpr=ratio;scale=Math.min(w/1.93,h/1.92);canvas.width=off.width=Math.round(w*dpr);canvas.height=off.height=Math.round(h*dpr);canvas.style.height=h+'px';dirty=true;requestDraw();}
 new ResizeObserver(resize).observe(stage);new MutationObserver(theme).observe(document.documentElement,{attributes:true,attributeFilter:['class','style','data-theme']});matchMedia('(prefers-color-scheme: dark)').addEventListener('change',theme);
-const visibility=new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;if(visible){last=0;requestDraw();}else if(raf){cancelAnimationFrame(raf);raf=0;}},{threshold:0});visibility.observe(canvas);
+const visibility=new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;if(visible){last=0;requestDraw();}else{if(raf){cancelAnimationFrame(raf);raf=0;}if(dirty)requestDraw();}},{threshold:0});visibility.observe(canvas);
 reduced.addEventListener('change',()=>{if(reduced.matches){playing=false;play.textContent='Play transfers';transition=null;requestDraw();}});
 resize();theme();updateDay();overview();playing=!reduced.matches;play.textContent=playing?'Pause transfers':'Play transfers';requestDraw();
 }

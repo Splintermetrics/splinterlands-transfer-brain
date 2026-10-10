@@ -37,7 +37,9 @@ jobs:
       - name: Check collection safeguards
         run: python -m unittest discover -s tests -v
       - name: Check JavaScript
-        run: node --check assets/brain.js
+        run: |
+          node --check assets/brain.js
+          node --check assets/history.js
       - name: Install browser test runner
         run: |
           npm install --no-save --package-lock=false playwright@1.62.1
@@ -47,11 +49,14 @@ jobs:
         run: |
           python scripts/collect_transfers.py --days 30 --output .refresh/source
           python scripts/build_graph.py
+          python scripts/build_history.py
       - name: Validate published graph
         run: |
           python -c "import sys,json;sys.path.insert(0,'scripts');from build_graph import validate;validate(json.load(open('data/graph.json')))"
       - name: Check search, direction colours, replay and mobile layout
-        run: node tests/browser.cjs
+        run: |
+          node tests/browser.cjs
+          node tests/history.cjs
       - name: Save refreshed graph and publish Pages
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         env:
