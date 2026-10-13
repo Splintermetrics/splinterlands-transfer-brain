@@ -20,6 +20,7 @@ const server=http.createServer((req,res)=>{
     const url=process.env.SITE_URL||'http://127.0.0.1:'+server.address().port;
     await page.goto(url);
     await page.waitForSelector('#splinterlands-brain:not(.loading)');
+    if(data.pack_gifts!==undefined)await page.locator('#brain-asset').selectOption('cards');
     assert.equal(await page.locator('#brain-player').getAttribute('placeholder'),'Enter a Splinterlands username');
     assert.equal(await page.locator('#brain-stat-gifts').textContent(),data.gifts.toLocaleString('en-US'));
     assert.equal(await page.locator('#brain-play').textContent(),'Pause transfers');
@@ -31,14 +32,15 @@ const server=http.createServer((req,res)=>{
     await page.waitForTimeout(1100);
     const selection=await page.locator('#brain-selection').textContent();
     assert(selection.includes(node[0]));
-    assert(selection.includes(node[4].toLocaleString('en-US')+' incoming'));
-    assert(selection.includes(node[5].toLocaleString('en-US')+' outgoing'));
+    assert(selection.includes(node[4].toLocaleString('en-US')+' cards incoming'));
+    assert(selection.includes(node[5].toLocaleString('en-US')+' cards outgoing'));
     const sums=await page.locator('#brain-rows tr').evaluateAll(rows=>rows.reduce((a,r)=>[a[0]+Number(r.children[1].textContent.replace(/,/g,'')),a[1]+Number(r.children[2].textContent.replace(/,/g,''))],[0,0]));
     assert.deepEqual(sums,[node[4],node[5]]);
     const colours=await page.evaluate(()=>[getComputedStyle(document.querySelector('#brain-key-in')).color,getComputedStyle(document.querySelector('#brain-key-out')).color]);
     assert.notEqual(colours[0],colours[1]);
-    const directIds=new Set(data.edges.filter(e=>data.nodes[e[0]][0]===node[0]||data.nodes[e[1]][0]===node[0]).flatMap(e=>[e[0],e[1]]));
-    const twoHopIds=new Set([...directIds,...data.edges.filter(e=>directIds.has(e[0])||directIds.has(e[1])).flatMap(e=>[e[0],e[1]])]);
+    const cardEdges=data.edges.filter(e=>e[2]>0);
+    const directIds=new Set(cardEdges.filter(e=>data.nodes[e[0]][0]===node[0]||data.nodes[e[1]][0]===node[0]).flatMap(e=>[e[0],e[1]]));
+    const twoHopIds=new Set([...directIds,...cardEdges.filter(e=>directIds.has(e[0])||directIds.has(e[1])).flatMap(e=>[e[0],e[1]])]);
     await page.locator('#brain-hops').selectOption('2');
     await page.waitForTimeout(1100);
     assert((await page.locator('#brain-selection').textContent()).includes((twoHopIds.size-1)+' players within 2 hops'));

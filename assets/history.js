@@ -1,13 +1,16 @@
 'use strict';
 function createTransferHistory(root,data,selectAccount){
 const q=id=>root.querySelector('#'+id),cache=new Map(),ownerCache=new Map(),pageSize=25,ownerMaxAge=60000;
-let player='',records=[],page=0,requestId=0,reloadNeeded=false,ownerGeneration=0,ownerController=null,ownerViews=[];
+let player='',records=[],page=0,requestId=0,reloadNeeded=false,ownerGeneration=0,ownerController=null,ownerViews=[],asset='cards';
 const element=(tag,text,cls)=>{const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(cls)el.className=cls;return el;};
 function account(name){const button=element('button',name,'btn btn-ghost history-account');button.type='button';button.addEventListener('click',()=>selectAccount(name));return button;}
 function direction(r){return r[2]===player&&r[3]===player?'self':r[3]===player?'in':'out';}
 function matchesDirection(r){const value=q('history-direction').value;return value==='all'||(value==='in'?r[3]===player:r[2]===player);}
 function other(r){return r[2]===player?r[3]:r[2];}
 function cardName(uid){const match=/^[CG]\d+-(\d+)-/.exec(uid);return match?(data.card_names?.[match[1]]||'Card #'+match[1]):'Card';}
+function packName(pack){return data.pack_names?.[`${pack[0]}:${pack[1]}`]||`Edition ${pack[0]} · ${pack[1]} pack`;}
+function assetMatches(r){return asset==='both'||(asset==='packs'?!!r[5]:!r[5]);}
+function quantities(cards,packs){return [asset!=='packs'?`${cards.toLocaleString()} card movements`:'',asset!=='cards'?`${packs.toLocaleString()} packs`:''].filter(Boolean).join(' · ');}
 function stopOwners(){ownerGeneration++;if(ownerController)ownerController.abort();ownerController=null;}
 function loadOwners(force=false){
 stopOwners();const token=ownerGeneration,views=ownerViews.slice(),controller=new AbortController();ownerController=controller;
@@ -24,16 +27,17 @@ Promise.all(Array.from({length:Math.min(2,Math.ceil(ids.length/50))},worker)).fi
 }
 function render(){
 stopOwners();ownerViews=[];
-const connection=q('history-account').value,byDirection=records.filter(matchesDirection),totals=new Map();
-for(const r of byDirection){const name=other(r),value=totals.get(name)||{gifts:0,cards:0};value.gifts++;value.cards+=r[4].length;totals.set(name,value);}
+const connection=q('history-account').value,byDirection=records.filter(r=>assetMatches(r)&&matchesDirection(r)),totals=new Map();
+for(const r of byDirection){const name=other(r),value=totals.get(name)||{gifts:0,cards:0,packs:0};value.gifts++;value.cards+=r[4].length;value.packs+=r[5]?.[2]||0;totals.set(name,value);}
 const chips=q('history-chips');chips.replaceChildren();
-for(const [name,total] of [...totals].sort((a,b)=>b[1].cards-a[1].cards)){const button=element('button',`${name} · ${total.gifts.toLocaleString()} gifts (${total.cards.toLocaleString()} cards)`,'history-chip');button.type='button';button.setAttribute('aria-pressed',String(connection===name));button.addEventListener('click',()=>{q('history-account').value=connection===name?'':name;page=0;render();});chips.append(button);}
+for(const [name,total] of [...totals].sort((a,b)=>(b[1].cards+b[1].packs)-(a[1].cards+a[1].packs))){const button=element('button',`${name} · ${total.gifts.toLocaleString()} gifts (${quantities(total.cards,total.packs)})`,'history-chip');button.type='button';button.setAttribute('aria-pressed',String(connection===name));button.addEventListener('click',()=>{q('history-account').value=connection===name?'':name;page=0;render();});chips.append(button);}
 const filtered=byDirection.filter(r=>!connection||other(r)===connection),start=page*pageSize,rows=q('history-rows');rows.replaceChildren();
 for(const r of filtered.slice(start,start+pageSize)){
  const tr=element('tr'),date=element('td'),stamp=element('time',r[0].slice(0,16).replace('T',' ')+' UTC');stamp.dateTime=r[0];date.append(stamp);tr.append(date);
  const dir=direction(r),kind=element('td');kind.append(element('span',dir==='self'?'↔ Self gift':dir==='in'?'↓ Incoming':'↑ Outgoing','history-badge '+(dir==='in'?'incoming':dir==='out'?'outgoing':'')));tr.append(kind);
  const accounts=element('td');accounts.append(account(r[2]),element('span',' → ','history-arrow'),account(r[3]));tr.append(accounts);
  const cards=element('td'),list=element('ul',undefined,'card-list'),ownerLabels=new Map();
+ if(r[5]){kind.append(element('span','Pack gift','history-badge pack-badge'));cards.append(element('strong',`${r[5][2].toLocaleString()} × ${packName(r[5])}`),element('div',`Edition ${r[5][0]} · ${r[5][1]}`,'owner-status'));tr.append(cards,element('td','Not individually traceable','pack-ownership'));rows.append(tr);continue;}
  function card(uid,parent){const li=element('li');li.append(element('span',cardName(uid)),element('code',uid));const owner=element('span',undefined,'card-owner');li.append(owner);ownerLabels.set(uid,owner);parent.append(li);}
  r[4].slice(0,3).forEach(uid=>card(uid,list));cards.append(list);
  if(r[4].length>3){const details=element('details',undefined,'more-cards'),summary=element('summary',`Show ${r[4].length-3} more cards`);details.append(summary);details.addEventListener('toggle',()=>{if(details.open&&!details.querySelector('ul')){const more=element('ul',undefined,'card-list');r[4].slice(3).forEach(uid=>card(uid,more));details.append(more);updateOwners(lastState);}});cards.append(details);}
@@ -48,7 +52,7 @@ for(const r of filtered.slice(start,start+pageSize)){
  }
  ownerViews.push({ids,update:updateOwners});
 }
-q('history-status').textContent=`${player}: ${filtered.length.toLocaleString()} gifts · ${filtered.reduce((n,r)=>n+r[4].length,0).toLocaleString()} card movements · ${data.start} – ${data.end}`;
+q('history-status').textContent=`${player}: ${filtered.length.toLocaleString()} gifts · ${quantities(filtered.reduce((n,r)=>n+r[4].length,0),filtered.reduce((n,r)=>n+(r[5]?.[2]||0),0))} · ${data.start} – ${data.end}`;
 q('history-page').textContent=filtered.length?`${start+1}–${Math.min(start+pageSize,filtered.length)} of ${filtered.length.toLocaleString()} gifts`:'No gifts match these filters.';
 q('history-prev').disabled=page===0;q('history-next').disabled=start+pageSize>=filtered.length;
 loadOwners();
@@ -58,7 +62,7 @@ if(data.history?.schema!==1){q('transfer-history').hidden=true;return;}
 player=name;records=[];page=0;reloadNeeded=false;const token=++requestId;
 stopOwners();ownerViews=[];
 q('transfer-history').hidden=false;q('history-direction').value='all';q('history-account').replaceChildren(element('option','All connections'));q('history-account').firstChild.value='';
-q('history-rows').replaceChildren();q('history-chips').replaceChildren();q('history-page').textContent='';q('history-prev').disabled=q('history-next').disabled=true;q('history-retry').hidden=true;q('history-status').textContent=`Loading ${name}’s card gifts…`;
+q('history-rows').replaceChildren();q('history-chips').replaceChildren();q('history-page').textContent='';q('history-prev').disabled=q('history-next').disabled=true;q('history-retry').hidden=true;q('history-status').textContent=`Loading ${name}’s gifts…`;
 try{
  if(data.history?.schema!==1)throw new Error('History unavailable');
  const shard=[...name].reduce((sum,c)=>sum+c.charCodeAt(0),0)%data.history.shards;
@@ -75,5 +79,5 @@ q('history-retry').addEventListener('click',()=>{if(reloadNeeded)location.reload
 setInterval(()=>{if(!ownerController&&!document.hidden&&!q('transfer-history').hidden&&q('transfer-history').open&&ownerViews.length)loadOwners(true);},ownerMaxAge);
 q('transfer-history').addEventListener('toggle',()=>{if(q('transfer-history').open&&!q('transfer-history').hidden&&ownerViews.length)loadOwners();});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!q('transfer-history').hidden&&q('transfer-history').open&&ownerViews.length)loadOwners();});
-return {show,hide(){requestId++;stopOwners();ownerViews=[];q('transfer-history').hidden=true;}};
+return {show,setAsset(value){asset=value;page=0;if(player&&records.length&&!q('transfer-history').hidden)render();},hide(){requestId++;stopOwners();ownerViews=[];q('transfer-history').hidden=true;}};
 }

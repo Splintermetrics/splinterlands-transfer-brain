@@ -1,20 +1,31 @@
 # Splinterlands Transfer Brain
 
-Explore the latest 30 complete UTC days of successful direct card gifts at
+Explore the latest 30 complete UTC days of successful direct card and pack gifts at
 https://transfers.splintermetrics.com.
 
 Search a player (case insensitive; @ prefixes work), tap a point, drag to pan,
 or scroll to zoom. Cyan dashed links show gifts **incoming** to the selected
-player; amber solid links show **outgoing** gifts. Arrowheads and replay pulses
+player; amber links show **outgoing** gifts. Dotted links carry pack gifts only.
+Arrowheads and replay pulses
 follow sender to recipient. Purple neighbours send and receive. The whole
 network uses neutral blue. Account positions remain stable between updates.
 
 After selecting a player, use **Connection depth** to choose one or two hops.
-The **Card transfer history** beneath the connection totals lists individual
+Use **Show transfers** to choose **Cards & packs**, **Cards only**, or **Packs
+only**. The filter applies to the brain, search suggestions, direct connections,
+two-hop neighbourhood, replay and history. Card movements and pack quantities
+have separate totals and columns; pack quantities are not multiplied by the
+number of cards in a pack. Accounts keep their positions when switching views.
+
+The **Transfer history** beneath the connection totals lists individual
 gifts newest first, with UTC times, sender/recipient accounts, card names and
 card IDs. Filter incoming/outgoing gifts or a particular connection and page
-through the results. Account buttons select that player in the brain.
-Current ownership loads automatically from Splinterlands for the displayed
+through the results. Pack rows show edition, variant and quantity. Known pack
+names come from the public item catalogue; unknown editions retain their
+edition number and variant. Packs do not have individual card-style IDs, so
+their current owner is labelled **Not individually traceable**.
+Account buttons select that player in the brain.
+Current card ownership loads automatically from Splinterlands for the displayed
 history page, showing account names and cards
 still with the recipient, now elsewhere, or unavailable (for example after
 combining or burning). Checks cover up to 100 cards per gift and report the
@@ -33,9 +44,9 @@ GitHub Actions runs daily at **02:17 UTC** (03:17 during British Summer Time,
 brain → Run workflow**. Scheduled runs can be delayed by GitHub.
 
 Each refresh:
-1. Traverses the filtered Splinterlands history across both date boundaries.
+1. Traverses both `gift_cards` and `gift_packs` histories across the date boundaries.
 2. Re-reads the final block of each page and deduplicates transaction IDs.
-3. Includes successful gifts only and reconciles payload/result card IDs.
+3. Includes successful gifts only, reconciles card IDs and validates whole pack quantities.
 4. Rebuilds player, edge and daily replay totals and checks their agreement.
 5. Runs collection safeguards and real browser checks.
 6. Commits the validated graph and compressed history to main and explicitly requests
@@ -52,15 +63,16 @@ deployment is reported as a failed workflow, with the previous published
 revision still available. The page shows its update timestamp and a delay
 notice if the snapshot is over 48 hours old. Workflow evidence and screenshots
 are retained for seven days. Source records stay in the runner's temporary
-workspace; the compact graph and card-level gift history are committed.
+workspace; the compact graph and card/pack gift history are committed.
 
 ## Scope
 
-Only successful `gift_cards` transactions returned by the global Splinterlands
+Only successful `gift_cards` and `gift_packs` transactions returned by the global Splinterlands
 history API are included. The filter is empirical and undocumented in the
 current Swagger; boundary traversal is not independent certification of all
-internal activity. Market sales, rentals, delegation and token transfers are
-excluded. Counts represent movements of individual card IDs, not BCX. Names
+internal activity. Market sales, rentals, delegation, currency transfers and
+external wallet movements are excluded. Card counts represent movements of
+individual card IDs, not BCX; pack counts represent transferred quantities. Names
 follow transaction payloads; similarly named accounts are not merged. The
 schematic brain shape does not establish common ownership. Replay displays
 recorded daily totals, not live transactions.
@@ -72,12 +84,14 @@ Python 3.12+ and Node.js 22+ are used in CI. Python uses the standard library.
 ```sh
 python -m unittest discover -s tests -v
 python scripts/collect_transfers.py --days 30 --output .refresh/source
-python scripts/build_graph.py
-python scripts/build_history.py
+python scripts/collect_transfers.py --days 30 --kind gift_packs --output .refresh/packs
+python scripts/build_graph.py --packs .refresh/packs
+python scripts/build_history.py --packs .refresh/packs
 npm install --no-save --package-lock=false playwright@1.62.1
 npx playwright install chromium
 node tests/browser.cjs
 node tests/history.cjs
+node tests/packs.cjs
 python -m http.server 8000
 ```
 

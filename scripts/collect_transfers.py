@@ -8,7 +8,7 @@ Python 3 standard library only. --end is exclusive (UTC). Example:
 The filtered API is empirical and undocumented in the current Swagger.
 Successful date-window traversal is not independent certification of all activity.
 """
-import argparse,collections,datetime,gzip,json,pathlib,sqlite3,time,urllib.parse,urllib.request
+import argparse,collections,datetime,gzip,json,math,pathlib,sqlite3,time,urllib.parse,urllib.request
 
 API='https://api.splinterlands.com'
 UTC=datetime.timezone.utc
@@ -30,23 +30,31 @@ def request(path,metrics):
 
 def stamp(date):return date.isoformat()+'T00:00:00.000Z'
 
-def collect(start,end,output,before_hint=None):
+def collect(start,end,output,before_hint=None,kind='gift_cards'):
+    if kind not in ('gift_cards','gift_packs'):raise ValueError('Unsupported gift type')
     output.mkdir(parents=True,exist_ok=True);metrics=[];seen={};pages=[];duplicate_rows=0;cursor=before_hint
     if cursor is None:cursor=int(request('/last_block',metrics)['last_block'])+1
-    upper_covered=False;lower_covered=False;earliest=None;latest=None
+    upper_covered=False;lower_covered=False;earliest=None;latest=None;head_proof=None
     for page_no in range(1,2001):
-        params={'before_block':cursor,'limit':1000,'types':'gift_cards'}
+        params={'before_block':cursor,'limit':1000,'types':kind}
         rows=request('/transactions/history?'+urllib.parse.urlencode(params),metrics)
         if not isinstance(rows,list):raise ValueError('Expected an array of transactions')
         with gzip.open(output/f'page-{page_no:04}.json.gz','wt',encoding='utf-8') as stream:json.dump(rows,stream)
         if not rows:raise RuntimeError('History ended before the lower date boundary; coverage incomplete')
-        if any(r['type']!='gift_cards' for r in rows):raise RuntimeError('Server ignored the gift_cards filter')
+        if any(r['type']!=kind for r in rows):raise RuntimeError('Server ignored the '+kind+' filter')
         blocks=[int(r['block_num']) for r in rows]
         if any(b>=cursor for b in blocks):raise RuntimeError('Unexpected before_block behaviour')
         if blocks!=sorted(blocks,reverse=True):raise RuntimeError('Records are not ordered by descending block')
         dates=[r['created_date'] for r in rows]
         page_min=min(dates);page_max=max(dates);earliest=min(earliest or page_min,page_min);latest=max(latest or page_max,page_max)
-        if page_no==1:upper_covered=page_max>=stamp(end)
+        if page_no==1:
+            upper_covered=page_max>=stamp(end)
+            if kind=='gift_packs' and not upper_covered:
+                # A quiet pack stream need not contain a gift today. Verify the
+                # same cursor against the current unfiltered transaction head.
+                head=request('/transactions/history?'+urllib.parse.urlencode({'before_block':cursor,'limit':1}),metrics)
+                if isinstance(head,list) and len(head)==1 and head[0]['block_num']<cursor and head[0]['created_date']>=stamp(end):
+                    upper_covered=True;head_proof={'block_num':head[0]['block_num'],'time_utc':head[0]['created_date']}
         for r in rows:
             if r['id'] in seen:duplicate_rows+=1
             seen[r['id']]=r
@@ -61,6 +69,22 @@ def collect(start,end,output,before_hint=None):
     else:raise RuntimeError('Page safety limit reached; coverage incomplete')
     if not upper_covered:raise RuntimeError('Initial page does not cross the end date; requested upper boundary is unverified')
     selected=sorted((r for r in seen.values() if stamp(start)<=r['created_date']<stamp(end)),key=lambda r:(r['created_date'],r['id']))
+    if kind=='gift_packs':
+        normal=[];failed=0
+        for r in selected:
+            if r['success'] is not True:failed+=1;continue
+            payload=json.loads(r['data']) if isinstance(r['data'],str) else r['data']
+            result=json.loads(r['result']) if isinstance(r['result'],str) else r['result']
+            qty=payload.get('qty');edition=payload.get('edition');variant=payload.get('type','standard')
+            if type(qty) not in (int,float) or qty<=0 or (isinstance(qty,float) and (not math.isfinite(qty) or not qty.is_integer())):
+                raise RuntimeError('Invalid pack quantity: '+r['id'])
+            if isinstance(edition,bool) or not isinstance(edition,int) or edition<0 or not isinstance(variant,str) or not variant or not isinstance(payload.get('to'),str) or not payload['to'] or result.get('success') is not True:
+                raise RuntimeError('Invalid successful pack gift: '+r['id'])
+            normal.append({'tx_id':r['id'],'block_num':r['block_num'],'time_utc':r['created_date'],'from':r['player'],'to':payload['to'],'cards':[],'pack':[edition,variant,int(qty)]})
+        summary={'start_utc':stamp(start),'end_utc_exclusive':stamp(end),'filter':kind,'pages':pages,'success_only':True,'head_boundary_proof':head_proof,'overlap_rows_deduplicated':duplicate_rows,'observed_failed_gifts':failed,'successful_gift_transactions':len(normal),'pack_movements':sum(r['pack'][2] for r in normal),'request_metrics':metrics}
+        (output/'summary.json').write_text(json.dumps(summary,indent=2))
+        (output/'transactions.json').write_text(json.dumps(normal,indent=2))
+        return summary
     connection=sqlite3.connect(output/'transfers.sqlite')
     connection.executescript('''
     CREATE TABLE IF NOT EXISTS transfers(tx_id TEXT PRIMARY KEY,block_num INTEGER NOT NULL,time_utc TEXT NOT NULL,sender TEXT NOT NULL,recipient TEXT NOT NULL,card_count INTEGER NOT NULL,raw_json TEXT NOT NULL);
@@ -94,11 +118,11 @@ def collect(start,end,output,before_hint=None):
     return summary
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--day',type=datetime.date.fromisoformat);p.add_argument('--end',type=datetime.date.fromisoformat);p.add_argument('--days',type=int,default=1);p.add_argument('--output',type=pathlib.Path,required=True);p.add_argument('--before-block',type=int)
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--day',type=datetime.date.fromisoformat);p.add_argument('--end',type=datetime.date.fromisoformat);p.add_argument('--days',type=int,default=1);p.add_argument('--output',type=pathlib.Path,required=True);p.add_argument('--before-block',type=int);p.add_argument('--kind',choices=['gift_cards','gift_packs'],default='gift_cards')
     args=p.parse_args()
     if args.day and args.end:p.error('Use --day or --end, not both')
     if args.days<1:p.error('--days must be positive')
     end=args.day+datetime.timedelta(days=1) if args.day else args.end or datetime.datetime.now(UTC).date()
     start=end-datetime.timedelta(days=args.days)
-    result=collect(start,end,args.output,args.before_block)
+    result=collect(start,end,args.output,args.before_block,args.kind)
     print(json.dumps({k:v for k,v in result.items() if k not in ['pages','request_metrics']},indent=2))

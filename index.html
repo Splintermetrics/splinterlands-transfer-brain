@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Explore the last 30 complete days of Splinterlands card gifts. Find a player, follow incoming and outgoing transfers, and replay daily activity.">
+<meta name="description" content="Explore the last 30 complete days of Splinterlands card and pack gifts. Find a player, follow incoming and outgoing transfers, and replay daily activity.">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' https://api.splinterlands.com; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'">
 <title>Splinterlands Transfer Brain | Splintermetrics</title>
 <script src="assets/theme.js"></script>
@@ -14,8 +14,8 @@
 <body>
 <main id="splinterlands-brain" class="loading">
   <header class="page-header">
-    <div><p class="eyebrow">SPLINTERMETRICS / CARD NETWORK</p><h1>Transfer brain<span class="title-dot">.</span></h1>
-      <p class="intro">Thirty days of card gifts. One connected world.</p></div>
+    <div><p class="eyebrow">SPLINTERMETRICS / TRANSFER NETWORK</p><h1>Transfer brain<span class="title-dot">.</span></h1>
+      <p class="intro">Thirty days of card and pack gifts. One connected world.</p></div>
     <div class="header-actions">
       <button class="btn theme-toggle" id="theme-toggle" type="button" aria-label="Switch to dark mode"><span class="theme-icon" aria-hidden="true">☾</span> <span class="theme-label">Dark mode</span></button>
       <div class="freshness"><span class="status-dot"></span><span id="brain-updated">Loading the latest snapshot…</span></div>
@@ -24,8 +24,9 @@
   <div class="summary-bar">
     <div class="period"><span class="label">Rolling 30-day window</span><span id="brain-period">Loading dates…</span></div>
     <div class="stat"><strong id="brain-stat-players">—</strong><span>players</span></div>
-    <div class="stat"><strong id="brain-stat-gifts">—</strong><span>card gifts</span></div>
-    <div class="stat"><strong id="brain-stat-cards">—</strong><span>card movements</span></div>
+    <div class="stat"><strong id="brain-stat-gifts">—</strong><span>gifts</span></div>
+    <div class="stat" id="brain-card-stat"><strong id="brain-stat-cards">—</strong><span>card movements</span></div>
+    <div class="stat" id="brain-pack-stat" hidden><strong id="brain-stat-packs">—</strong><span>packs moved</span></div>
   </div>
   <section class="network-panel" aria-label="Explore the transfer network">
     <form id="brain-search" class="viz-controls search-controls">
@@ -37,6 +38,8 @@
       <button class="btn btn-secondary" id="brain-overview" type="button">Whole network</button>
     </form>
     <div class="neighbourhood-controls">
+      <label for="brain-asset">Show transfers</label>
+      <select id="brain-asset" disabled><option value="both">Cards &amp; packs</option><option value="cards">Cards only</option><option value="packs">Packs only</option></select>
       <label for="brain-hops">Connection depth</label>
       <select id="brain-hops" disabled>
         <option value="1">1 hop · direct connections</option>
@@ -49,6 +52,7 @@
       <span id="brain-key-in" class="incoming"><span class="line-key dashed"></span>↓ Incoming</span>
       <span id="brain-key-out" class="outgoing"><span class="line-key"></span>↑ Outgoing</span>
       <span id="brain-key-second" class="second-hop" hidden><span class="line-key"></span>2-hop links</span>
+      <span id="brain-key-packs" hidden><span class="line-key dotted"></span>Pack-only links</span>
       <span id="brain-legend-note">Select a player to reveal incoming and outgoing transfers.</span>
     </div>
     <div id="brain-stage">
@@ -68,11 +72,11 @@
     <div id="brain-selection" aria-live="polite">Loading players…</div>
     <details id="brain-connections" hidden>
       <summary>Direct player connections <span>30-day totals</span></summary>
-      <div class="table-responsive"><table><thead><tr><th scope="col">Player</th><th scope="col" class="incoming">↓ Incoming cards</th><th scope="col" class="outgoing">↑ Outgoing cards</th><th scope="col">Gifts</th></tr></thead><tbody id="brain-rows"></tbody></table></div>
+      <div class="table-responsive"><table><thead><tr><th scope="col">Player</th><th scope="col" class="incoming" data-unit="cards">↓ Incoming cards</th><th scope="col" class="outgoing" data-unit="cards">↑ Outgoing cards</th><th scope="col" class="incoming" data-unit="packs">↓ Incoming packs</th><th scope="col" class="outgoing" data-unit="packs">↑ Outgoing packs</th><th scope="col">Gifts</th></tr></thead><tbody id="brain-rows"></tbody></table></div>
     </details>
     <details id="transfer-history" hidden open>
-      <summary>Card transfer history <span>Newest first · UTC</span></summary>
-      <p class="history-note">Successful gifts in this 30-day window. Click an account to explore it. Current owners load automatically and refresh every minute while this history is open (up to 100 cards per gift). Unavailable cards may have been combined or burned.</p>
+      <summary>Transfer history <span>Newest first · UTC</span></summary>
+      <p class="history-note">Successful card and pack gifts in this 30-day window. Click an account to explore it. Card owners load automatically and refresh every minute (up to 100 cards per gift). Packs are counted by edition and quantity; individual pack ownership cannot be traced.</p>
       <div class="history-controls">
         <label for="history-direction">Direction<select id="history-direction"><option value="all">Incoming &amp; outgoing</option><option value="in">↓ Incoming gifts</option><option value="out">↑ Outgoing gifts</option></select></label>
         <label for="history-account">Connection<select id="history-account"><option value="">All connections</option></select></label>
@@ -80,13 +84,13 @@
       <p id="history-status" role="status" aria-live="polite"></p>
       <button id="history-retry" class="btn" type="button" hidden>Retry history</button>
       <div id="history-chips" class="history-chips" aria-label="Filter history by connection"></div>
-      <div class="table-responsive history-table"><table aria-label="Individual card gifts"><thead><tr><th scope="col">When</th><th scope="col">Direction</th><th scope="col">From → To</th><th scope="col">Cards</th><th scope="col">Current owner</th></tr></thead><tbody id="history-rows"></tbody></table></div>
+      <div class="table-responsive history-table"><table aria-label="Individual gifts"><thead><tr><th scope="col">When</th><th scope="col">Direction</th><th scope="col">From → To</th><th scope="col">Cards / packs</th><th scope="col">Current owner</th></tr></thead><tbody id="history-rows"></tbody></table></div>
       <div class="history-pagination"><button id="history-prev" class="btn" type="button">← Newer</button><span id="history-page"></span><button id="history-next" class="btn" type="button">Older →</button></div>
     </details>
   </section>
   <footer>
-    <p><strong>About this network</strong> · Successful direct card gifts only. Market sales, rentals, delegation and token transfers are excluded. Counts are movements of individual card IDs, not BCX.</p>
-    <p>Larger points have more connections; thicker links carry more card movements. Replay shows recorded daily activity. The brain layout is schematic and does not establish common ownership.</p>
+    <p><strong>About this network</strong> · Successful direct card and pack gifts only. Market sales, rentals, delegation, currency transfers and external wallet movements are excluded. Cards count individual IDs, not BCX; packs count quantities, not cards inside them.</p>
+    <p>Larger points have more connections; thicker links carry more cards or packs. Dotted links carry pack gifts only. Replay shows recorded daily activity. The brain layout is schematic and does not establish common ownership.</p>
     <a href="https://github.com/Splintermetrics/splinterlands-transfer-brain">Source &amp; update history ↗</a>
   </footer>
   <noscript>This network needs JavaScript. Enable it to search players and replay card gifts.</noscript>

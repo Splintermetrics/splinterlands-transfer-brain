@@ -48,8 +48,9 @@ jobs:
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         run: |
           python scripts/collect_transfers.py --days 30 --output .refresh/source
-          python scripts/build_graph.py
-          python scripts/build_history.py
+          python scripts/collect_transfers.py --days 30 --kind gift_packs --output .refresh/packs
+          python scripts/build_graph.py --packs .refresh/packs
+          python scripts/build_history.py --packs .refresh/packs
       - name: Validate published graph
         run: |
           python -c "import sys,json;sys.path.insert(0,'scripts');from build_graph import validate;validate(json.load(open('data/graph.json')))"
@@ -57,6 +58,7 @@ jobs:
         run: |
           node tests/browser.cjs
           node tests/history.cjs
+          node tests/packs.cjs
       - name: Save refreshed graph and publish Pages
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         env:
@@ -70,5 +72,6 @@ jobs:
           path: |
             test-results/
             .refresh/source/summary.json
+            .refresh/packs/summary.json
           retention-days: 7
           if-no-files-found: ignore

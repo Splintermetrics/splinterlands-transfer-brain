@@ -16,9 +16,10 @@ page.on('pageerror',e=>errors.push(e.message));
 const url=process.env.SITE_URL||'http://127.0.0.1:'+server.address().port;
 if(process.env.CHECK_LIVE_OWNERS!=='1')await page.route('https://api.splinterlands.com/cards/find?*',route=>route.fulfill({json:new URL(route.request().url()).searchParams.get('ids').split(',').map(uid=>({uid,player:'fixture-owner'}))}));
 await page.goto(url);await page.waitForSelector('#splinterlands-brain:not(.loading)');
+if(data.pack_gifts!==undefined)await page.locator('#brain-asset').selectOption('cards');
 async function select(name){await page.locator('#brain-player').fill(name);await page.locator('#brain-search button[type=submit]').click();}
 const name=data.nodes.some(n=>n[0]==='animeboy09')?'animeboy09':data.nodes.find(n=>n[4]>0||n[5]>0)[0],shard=[...name].reduce((s,c)=>s+c.charCodeAt(0),0)%32;
-const liveHistory=JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(root,'data/history',String(shard).padStart(2,'0')+'.json.gz'))).toString('utf8')).players[name];
+const liveHistory=JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(root,'data/history',String(shard).padStart(2,'0')+'.json.gz'))).toString('utf8')).players[name].filter(r=>!r[5]);
 await select(name);await page.waitForSelector('#history-rows tr');
 assert((await page.locator('#history-status').textContent()).includes(liveHistory.length+' gifts'));
 assert.equal(await page.locator('#history-rows tr').count(),Math.min(25,liveHistory.length));
