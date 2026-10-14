@@ -52,6 +52,10 @@ input:focus-visible,button:focus-visible,summary:focus-visible,a:focus-visible{o
 @media(max-width:720px){.neighbourhood-controls{padding:0 18px 14px}#brain-hop-help{flex-basis:100%}}
 #brain-stage{position:relative;width:100%;background:radial-gradient(ellipse at 50% 50%,light-dark(#eff5fa,#142638) 0%,transparent 70%)}
 #brain-canvas{display:block;width:100%;touch-action:none;cursor:grab}#brain-canvas:active{cursor:grabbing}
+.zoom-controls{position:absolute;top:12px;right:12px;z-index:2;display:flex;align-items:center;gap:2px;padding:4px;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 2px 10px #0001}
+.zoom-controls button{min-width:44px;min-height:44px;border:0;border-radius:6px;background:transparent;color:var(--foreground);font-size:22px;touch-action:manipulation}
+.zoom-controls button:hover{background:var(--background)}.zoom-controls button:last-child{font-size:12px;font-weight:650}
+.zoom-controls output{min-width:48px;margin:0;text-align:center;font-size:11px;font-variant-numeric:tabular-nums}
 #brain-tooltip{position:absolute;pointer-events:none;max-width:260px;padding:6px 10px;border-radius:6px;background:var(--popover);border:1px solid var(--border);color:var(--popover-foreground);font-size:12px;overflow-wrap:anywhere;z-index:2}
 .canvas-hint{position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:10px;letter-spacing:.04em;color:var(--muted-foreground);pointer-events:none}
 .replay-controls{align-items:center;padding:18px 24px;border-top:1px solid var(--border);gap:24px}

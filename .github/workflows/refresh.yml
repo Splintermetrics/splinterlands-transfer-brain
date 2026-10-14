@@ -59,6 +59,7 @@ jobs:
           node tests/browser.cjs
           node tests/history.cjs
           node tests/packs.cjs
+          node tests/touch.cjs
       - name: Save refreshed graph and publish Pages
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         env:

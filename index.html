@@ -57,8 +57,14 @@
     </div>
     <div id="brain-stage">
       <canvas id="brain-canvas" role="img" aria-label="Brain-shaped network of players and directed card gifts. Search a player to inspect their connections in the table below."></canvas>
+      <div class="zoom-controls" role="group" aria-label="Graph zoom">
+        <button id="brain-zoom-out" type="button" aria-label="Zoom out" aria-controls="brain-canvas">−</button>
+        <output id="brain-zoom-level" aria-label="Zoom level" aria-live="off">100%</output>
+        <button id="brain-zoom-in" type="button" aria-label="Zoom in" aria-controls="brain-canvas">+</button>
+        <button id="brain-zoom-fit" type="button" aria-label="Fit graph to view" aria-controls="brain-canvas">Fit</button>
+      </div>
       <div id="brain-tooltip" role="tooltip" hidden></div>
-      <p class="canvas-hint">Drag to pan · scroll to zoom · tap a player</p>
+      <p class="canvas-hint">Drag to pan · pinch or scroll to zoom · tap a player</p>
     </div>
     <div class="replay-controls viz-controls">
       <button class="btn btn-secondary" id="brain-play" type="button">Play transfers</button>

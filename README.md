@@ -4,7 +4,10 @@ Explore the latest 30 complete UTC days of successful direct card and pack gifts
 https://transfers.splintermetrics.com.
 
 Search a player (case insensitive; @ prefixes work), tap a point, drag to pan,
-or scroll to zoom. Cyan dashed links show gifts **incoming** to the selected
+or scroll to zoom. On mobile, pinch with two fingers to zoom and drag with one finger to
+pan. The graph also has **+**, **−** and **Fit** buttons with large touch targets;
+Fit restores the current player's neighbourhood (or the whole network).
+Cyan links show gifts **incoming** to the selected
 player; amber links show **outgoing** gifts. Dotted links carry pack gifts only.
 Arrowheads and replay pulses
 follow sender to recipient. Purple neighbours send and receive. The whole
@@ -92,6 +95,7 @@ npx playwright install chromium
 node tests/browser.cjs
 node tests/history.cjs
 node tests/packs.cjs
+node tests/touch.cjs
 python -m http.server 8000
 ```
 
