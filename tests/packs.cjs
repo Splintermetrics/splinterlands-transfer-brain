@@ -28,7 +28,7 @@ assert.equal(await page.locator('#history-rows time').first().getAttribute('date
 assert((await page.locator('#history-rows tr').first().textContent()).includes(history[0][5][2].toLocaleString('en-US')+' ×'));
 assert.equal(ownerRequests,0,'Pack quantities must never be sent to card ownership lookup');
 const packEdges=data.edges.filter(e=>e[6]>0),direct=new Set([id,...packEdges.filter(e=>e[0]===id||e[1]===id).flatMap(e=>e.slice(0,2))]),two=new Set([...direct,...packEdges.filter(e=>direct.has(e[0])||direct.has(e[1])).flatMap(e=>e.slice(0,2))]);
-await page.locator('#brain-hops').selectOption('2');assert((await page.locator('#brain-canvas').getAttribute('aria-label')).includes((two.size-1)+' other players within 2 hops'));
+assert(await page.locator('#brain-hops').isDisabled(),'Pack-only mode cannot trace unique items');assert((await page.locator('#brain-canvas').getAttribute('aria-label')).includes((direct.size-1)+' other players within 1 hop'));
 fs.mkdirSync(path.join(root,'test-results'),{recursive:true});await page.screenshot({path:path.join(root,'test-results/packs-dark.png'),fullPage:true});
 await page.getByRole('button',{name:'Switch to light mode'}).click();await page.setViewportSize({width:390,height:1000});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:path.join(root,'test-results/packs-mobile.png'),fullPage:true});
 // A shared edge has one card gift and one pack gift. Pack-only accounts must
@@ -42,9 +42,9 @@ ownerRequests=0;await page.reload();await page.waitForSelector('#splinterlands-b
 assert.equal(await page.locator('#history-rows tr').count(),2);assert.equal(ownerRequests,0);assert.equal(await page.locator('#brain-stat-gifts').textContent(),'3');
 assert((await page.locator('#brain-selection').textContent()).includes('4 packs incoming'));
 assert((await page.locator('#brain-selection').textContent()).includes('3 packs outgoing'));
-await page.locator('#brain-hops').selectOption('2');assert((await page.locator('#brain-canvas').getAttribute('aria-label')).includes('3 other players within 2 hops'));
+assert(await page.locator('#brain-hops').isDisabled());assert((await page.locator('#brain-canvas').getAttribute('aria-label')).includes('2 other players within 1 hop'));
 await page.locator('#brain-day').fill('29');await page.locator('#brain-day').dispatchEvent('input');assert.equal(await page.locator('#brain-day-count').textContent(),'3 gifts · 12 packs');
-await page.locator('#brain-asset').selectOption('cards');assert((await page.locator('#brain-canvas').getAttribute('aria-label')).includes('1 other players within 2 hops'));assert.equal(await page.locator('#history-rows tr').count(),1);assert((await page.locator('#history-status').textContent()).includes('2 card movements'));
+await page.locator('#brain-asset').selectOption('cards');assert((await page.locator('#brain-canvas').getAttribute('aria-label')).includes('1 other players within 1 hop'));assert.equal(await page.locator('#history-rows tr').count(),1);assert((await page.locator('#history-status').textContent()).includes('2 card movements'));
 await page.waitForFunction(()=>document.querySelector('.owner-status')?.textContent.includes('checked'));assert.equal(ownerRequests,1);
 await page.locator('#brain-asset').selectOption('both');assert.equal(await page.locator('#history-rows tr').count(),3);assert.equal(await page.locator('#brain-stat-gifts').textContent(),'4');assert.equal(await page.locator('#brain-day-count').textContent(),'4 gifts · 2 cards + 12 packs');
 assert((await page.locator('#history-status').textContent()).includes('2 card movements · 7 packs'));

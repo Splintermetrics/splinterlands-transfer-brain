@@ -40,6 +40,7 @@ jobs:
         run: |
           node --check assets/brain.js
           node --check assets/history.js
+          node --check assets/card-paths.js
       - name: Install browser test runner
         run: |
           npm install --no-save --package-lock=false playwright@1.62.1
@@ -51,6 +52,7 @@ jobs:
           python scripts/collect_transfers.py --days 30 --kind gift_packs --output .refresh/packs
           python scripts/build_graph.py --packs .refresh/packs
           python scripts/build_history.py --packs .refresh/packs
+          python scripts/build_card_paths.py
       - name: Validate published graph
         run: |
           python -c "import sys,json;sys.path.insert(0,'scripts');from build_graph import validate;validate(json.load(open('data/graph.json')))"
@@ -60,6 +62,7 @@ jobs:
           node tests/history.cjs
           node tests/packs.cjs
           node tests/touch.cjs
+          node tests/card-paths.cjs
       - name: Save refreshed graph and publish Pages
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         env:

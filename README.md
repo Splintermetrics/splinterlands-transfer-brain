@@ -36,9 +36,22 @@ check time. Batched lookups reuse results for one minute and refresh every
 minute while history is open. History follows the same daily 30-day snapshot as the network;
 market sales, rentals and delegations are not included.
 
-Two hops includes connections of direct neighbours, following gifts in either
-direction. Other links inside this neighbourhood are blue. The camera fits the
-expanded view; the table and incoming/outgoing totals remain direct gifts.
+**2 hops · follow the same cards** uses unique card IDs and consecutive observed
+gifts in block order. It follows a direct gift one move onward or one move
+upstream, such as `you → A → B` or `B → A → you`, and can show cards entering
+and leaving the selected account. A neighbour's unrelated cards and third hops
+are excluded. Ambiguous same-block ordering and gaps between different owners
+are not bridged. Blue links show matched continuations; their width and replay
+pulses use only the matched cards. The **Cards followed over two hops** list
+shows card IDs and clickable account routes, including returns. Counts of
+matching cards are deduplicated across routes. This describes observed gifts
+within the 30-day window, not mint origins, continuous ownership or current
+ownership. Direct connection/history totals retain their original scope.
+
+Packs have no individual IDs, so packs-only mode stays at one hop. In the
+combined view direct pack gifts remain visible, and second hops trace cards.
+The matching index is compressed, loaded on demand and refreshed with the
+same snapshot as the graph; mismatched snapshots require a reload.
 
 ## Automatic refresh
 
@@ -90,12 +103,14 @@ python scripts/collect_transfers.py --days 30 --output .refresh/source
 python scripts/collect_transfers.py --days 30 --kind gift_packs --output .refresh/packs
 python scripts/build_graph.py --packs .refresh/packs
 python scripts/build_history.py --packs .refresh/packs
+python scripts/build_card_paths.py
 npm install --no-save --package-lock=false playwright@1.62.1
 npx playwright install chromium
 node tests/browser.cjs
 node tests/history.cjs
 node tests/packs.cjs
 node tests/touch.cjs
+node tests/card-paths.cjs
 python -m http.server 8000
 ```
 

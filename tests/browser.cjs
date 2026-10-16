@@ -1,5 +1,5 @@
 const {chromium}=require('playwright');
-const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),zlib=require('node:zlib');
 const root=path.resolve(__dirname,'..');
 const data=JSON.parse(fs.readFileSync(path.join(root,'data/graph.json'),'utf8'));
 const server=http.createServer((req,res)=>{
@@ -40,8 +40,10 @@ const server=http.createServer((req,res)=>{
     assert.notEqual(colours[0],colours[1]);
     const cardEdges=data.edges.filter(e=>e[2]>0);
     const directIds=new Set(cardEdges.filter(e=>data.nodes[e[0]][0]===node[0]||data.nodes[e[1]][0]===node[0]).flatMap(e=>[e[0],e[1]]));
-    const twoHopIds=new Set([...directIds,...cardEdges.filter(e=>directIds.has(e[0])||directIds.has(e[1])).flatMap(e=>[e[0],e[1]])]);
+    const twoHopIds=new Set(directIds),rootId=data.nodes.indexOf(node),pathData=JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(root,'data/card-paths.json.gz'))));
+    for(const [first,second] of pathData.paths){const a=data.edges[first],b=data.edges[second];if(a[0]===rootId&&a[1]!==rootId&&b[0]!==rootId)b.slice(0,2).forEach(id=>twoHopIds.add(id));if(b[1]===rootId&&b[0]!==rootId&&a[1]!==rootId)a.slice(0,2).forEach(id=>twoHopIds.add(id));}
     await page.locator('#brain-hops').selectOption('2');
+    await page.waitForFunction(()=>document.querySelector('#brain-selection').textContent.includes('cards followed'));
     await page.waitForTimeout(1100);
     assert((await page.locator('#brain-selection').textContent()).includes((twoHopIds.size-1)+' players within 2 hops'));
     assert(await page.locator('#brain-key-second').isVisible());
@@ -85,15 +87,17 @@ const server=http.createServer((req,res)=>{
     await page.getByRole('button',{name:'Switch to light mode'}).focus();
     await page.keyboard.press('Enter');
     assert.equal(await page.evaluate(()=>getComputedStyle(document.documentElement).colorScheme),'light');
-    const fixture={start:data.start,end:data.end,snapshot:data.snapshot,gifts:5,movements:5,
-      nodes:[['alpha',-.5,0,1,1,1],['beta',0,0,2,2,1],['gamma',.5,0,2,1,1],['delta',.7,.3,1,0,1],['island',-.7,.5,1,1,1]],
-      edges:[[0,1,1,1,data.start,data.start],[1,0,1,1,data.start,data.start],[2,1,1,1,data.start,data.start],[3,2,1,1,data.start,data.start],[4,4,1,1,data.start,data.start]],
-      daily:[[0,0,1,1],[0,1,1,1],[0,2,1,1],[0,3,1,1],[0,4,1,1]]};
+    const fixture={start:data.start,end:data.end,snapshot:data.snapshot,updated_at:'path-fixture',gifts:5,movements:6,card_paths:{schema:1},
+      nodes:[['alpha',-.5,0,1,1,1],['beta',0,0,2,3,1],['gamma',.5,0,2,1,2],['delta',.7,.3,1,0,1],['island',-.7,.5,1,1,1]],
+      edges:[[0,1,1,1,data.start,data.start],[1,0,1,1,data.start,data.start],[2,1,1,2,data.start,data.start],[3,2,1,1,data.start,data.start],[4,4,1,1,data.start,data.start]],
+      daily:[[0,0,1,1],[1,1,1,1],[0,2,2,1],[0,3,1,1],[0,4,1,1]]};
     await page.route('**/data/graph.json',route=>route.fulfill({json:fixture}));
+    await page.route('**/data/card-paths.json.gz',route=>route.fulfill({body:zlib.gzipSync(JSON.stringify({schema:1,updated_at:'path-fixture',paths:[[2,1,[['A',[[0,1]]]]],[3,2,[['B',[[0,1]]]]]]}))}));
     await page.reload();await page.waitForSelector('#splinterlands-brain:not(.loading)');
     await page.locator('#brain-player').fill('alpha');await page.locator('#brain-search button[type=submit]').click();
     assert((await page.locator('#brain-canvas').getAttribute('aria-label')).includes('1 other players within 1 hop'));
     await page.locator('#brain-hops').selectOption('2');
+    await page.waitForFunction(()=>document.querySelector('#brain-selection').textContent.includes('cards followed'));
     assert((await page.locator('#brain-canvas').getAttribute('aria-label')).includes('2 other players within 2 hops'),'Cycle must not duplicate the root or include a third-hop or disconnected player');
     assert.deepEqual(await page.locator('#brain-rows tr td:first-child').allTextContents(),['beta'],'Direct-transfer table must stay direct');
     await page.locator('#brain-rows button').click();

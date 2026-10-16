@@ -9,6 +9,7 @@
 <script src="assets/theme.js"></script>
 <link rel="stylesheet" href="assets/site.css">
 <script src="assets/history.js" defer></script>
+<script src="assets/card-paths.js" defer></script>
 <script src="assets/brain.js" defer></script>
 </head>
 <body>
@@ -43,7 +44,7 @@
       <label for="brain-hops">Connection depth</label>
       <select id="brain-hops" disabled>
         <option value="1">1 hop · direct connections</option>
-        <option value="2">2 hops · connections of connections</option>
+        <option value="2">2 hops · follow the same cards</option>
       </select>
       <span id="brain-hop-help">Find a player to explore their neighbourhood.</span>
     </div>
@@ -51,7 +52,7 @@
     <div class="legend">
       <span id="brain-key-in" class="incoming"><span class="line-key dashed"></span>↓ Incoming</span>
       <span id="brain-key-out" class="outgoing"><span class="line-key"></span>↑ Outgoing</span>
-      <span id="brain-key-second" class="second-hop" hidden><span class="line-key"></span>2-hop links</span>
+      <span id="brain-key-second" class="second-hop" hidden><span class="line-key"></span>Same-card paths</span>
       <span id="brain-key-packs" hidden><span class="line-key dotted"></span>Pack-only links</span>
       <span id="brain-legend-note">Select a player to reveal incoming and outgoing transfers.</span>
     </div>
@@ -76,6 +77,12 @@
   </section>
   <section class="selection-panel">
     <div id="brain-selection" aria-live="polite">Loading players…</div>
+    <details id="brain-item-paths" hidden>
+      <summary>Cards followed over two hops <span id="brain-path-count"></span></summary>
+      <p class="history-note">Matching card IDs in consecutive recorded gifts within this window, in block order. These paths show observed gifts, not where a card was minted or its current owner. Pack quantities cannot be traced this way.</p>
+      <div class="table-responsive"><table><thead><tr><th scope="col">Card</th><th scope="col">Gift path</th></tr></thead><tbody id="brain-path-rows"></tbody></table></div>
+      <div class="history-pagination"><button id="brain-path-prev" class="btn" type="button">← Previous</button><span id="brain-path-page"></span><button id="brain-path-next" class="btn" type="button">Next →</button></div>
+    </details>
     <details id="brain-connections" hidden>
       <summary>Direct player connections <span>30-day totals</span></summary>
       <div class="table-responsive"><table><thead><tr><th scope="col">Player</th><th scope="col" class="incoming" data-unit="cards">↓ Incoming cards</th><th scope="col" class="outgoing" data-unit="cards">↑ Outgoing cards</th><th scope="col" class="incoming" data-unit="packs">↓ Incoming packs</th><th scope="col" class="outgoing" data-unit="packs">↑ Outgoing packs</th><th scope="col">Gifts</th></tr></thead><tbody id="brain-rows"></tbody></table></div>
