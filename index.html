@@ -31,11 +31,12 @@
   </div>
   <section class="network-panel" aria-label="Explore the transfer network">
     <form id="brain-search" class="viz-controls search-controls">
-      <label for="brain-player">Find a player
-        <input id="brain-player" list="brain-players" placeholder="Enter a Splinterlands username" autocomplete="off" spellcheck="false">
+      <label for="brain-player">Find players
+        <input id="brain-player" list="brain-players" placeholder="Enter usernames, separated by commas" aria-describedby="brain-search-help" autocomplete="off" spellcheck="false">
+        <span id="brain-search-help">Select one player or enter several names separated by commas.</span>
       </label>
       <datalist id="brain-players"></datalist>
-      <button class="btn btn-primary" type="submit">Find player <span aria-hidden="true">↗</span></button>
+      <button class="btn btn-primary" type="submit">Find players <span aria-hidden="true">↗</span></button>
       <button class="btn btn-secondary" id="brain-overview" type="button">Whole network</button>
     </form>
     <div class="neighbourhood-controls">
@@ -52,6 +53,7 @@
     <div class="legend">
       <span id="brain-key-in" class="incoming"><span class="line-key dashed"></span>↓ Incoming</span>
       <span id="brain-key-out" class="outgoing"><span class="line-key"></span>↑ Outgoing</span>
+      <span id="brain-key-internal" hidden><span class="line-key"></span>↔ Between selected players</span>
       <span id="brain-key-second" class="second-hop" hidden><span class="line-key"></span>Same-card paths</span>
       <span id="brain-key-packs" hidden><span class="line-key dotted"></span>Pack-only links</span>
       <span id="brain-legend-note">Select a player to reveal incoming and outgoing transfers.</span>

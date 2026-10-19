@@ -3,7 +3,7 @@
 Explore the latest 30 complete UTC days of successful direct card and pack gifts at
 https://transfers.splintermetrics.com.
 
-Search a player (case insensitive; @ prefixes work), tap a point, drag to pan,
+Search one player or several separated by commas (case insensitive; @ prefixes work), tap a point, drag to pan,
 or scroll to zoom. On mobile, pinch with two fingers to zoom and drag with one finger to
 pan. The graph also has **+**, **−** and **Fit** buttons with large touch targets;
 Fit restores the current player's neighbourhood (or the whole network).
@@ -12,6 +12,16 @@ player; amber links show **outgoing** gifts. Dotted links carry pack gifts only.
 Arrowheads and replay pulses
 follow sender to recipient. Purple neighbours send and receive. The whole
 network uses neutral blue. Account positions remain stable between updates.
+
+Multiple names select a combined neighbourhood. Every selected player is ringed;
+incoming/outgoing colours are relative to the selected group, and purple links
+show gifts between selected players. Totals sum the selected players' incoming
+and outgoing movements, so a gift within the group counts once in each direction.
+Direct connection gift counts, history records and two-hop card paths are
+deduplicated. History filters apply to the group; internal gifts appear in both
+direction filters. Suggestions complete the name after the last comma. Unknown
+or ambiguous names leave the previous selection in place with an explanation.
+Clicking a graph point or an account button selects that player on its own.
 
 After selecting a player, use **Connection depth** to choose one or two hops.
 Use **Show transfers** to choose **Cards & packs**, **Cards only**, or **Packs

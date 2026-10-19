@@ -63,6 +63,7 @@ jobs:
           node tests/packs.cjs
           node tests/touch.cjs
           node tests/card-paths.cjs
+          node tests/multi-player.cjs
       - name: Save refreshed graph and publish Pages
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         env:

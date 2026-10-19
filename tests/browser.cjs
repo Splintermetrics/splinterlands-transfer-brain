@@ -21,7 +21,7 @@ const server=http.createServer((req,res)=>{
     await page.goto(url);
     await page.waitForSelector('#splinterlands-brain:not(.loading)');
     if(data.pack_gifts!==undefined)await page.locator('#brain-asset').selectOption('cards');
-    assert.equal(await page.locator('#brain-player').getAttribute('placeholder'),'Enter a Splinterlands username');
+    assert.equal(await page.locator('#brain-player').getAttribute('placeholder'),'Enter usernames, separated by commas');
     assert.equal(await page.locator('#brain-stat-gifts').textContent(),data.gifts.toLocaleString('en-US'));
     assert.equal(await page.locator('#brain-play').textContent(),'Pause transfers');
     await page.locator('#brain-play').click();

@@ -43,6 +43,10 @@ input:focus-visible,button:focus-visible,summary:focus-visible,a:focus-visible{o
 .line-key{display:inline-block;width:20px;border-top:2px solid currentColor}.line-key.dashed{border-top-style:dashed}
 .line-key.dotted{border-top-style:dotted}#brain-key-packs{display:flex;align-items:center;gap:6px;color:var(--muted-foreground)}
 .incoming{color:var(--incoming)}.outgoing{color:var(--outgoing)}
+#brain-search-help{font-size:11px;font-weight:400;color:var(--muted-foreground)}
+#brain-selection{overflow-wrap:anywhere}
+#brain-key-internal{color:var(--both)}
+.internal{color:var(--both)}
 .second-hop{color:var(--network);display:flex;align-items:center;gap:6px;font-weight:650}
 .neighbourhood-controls{display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:0 24px 14px;font-size:11px;color:var(--muted-foreground)}
 .neighbourhood-controls label{font-size:11px}

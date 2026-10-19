@@ -15,6 +15,7 @@ async function load(){
  return pending;
 }
 function trace(selected,available){
+ const selectedPlayers=selected instanceof Set?selected:new Set([selected]);
  const links=new Map(),days=new Map(),cards=new Set(),routes=new Map();
  function add(edge,uid,pairs,leg,first,second){
   if(!links.has(edge))links.set(edge,new Set());links.get(edge).add(uid);cards.add(uid);
@@ -26,8 +27,8 @@ function trace(selected,available){
   if(!available.has(first)||!available.has(second))continue;const a=data.edges[first],b=data.edges[second];
   // A gift to or from the selected account anchors the route. Follow just
   // its adjacent observed gift, never recursively expand the intermediary.
-  if(a[0]===selected||a[1]===selected)for(const [uid,pairs] of items)add(second,uid,pairs,1,first,second);
-  if(b[0]===selected||b[1]===selected)for(const [uid,pairs] of items)add(first,uid,pairs,0,first,second);
+  if(selectedPlayers.has(a[0])||selectedPlayers.has(a[1]))for(const [uid,pairs] of items)add(second,uid,pairs,1,first,second);
+  if(selectedPlayers.has(b[0])||selectedPlayers.has(b[1]))for(const [uid,pairs] of items)add(first,uid,pairs,0,first,second);
  }
  return {links,days,cards,routes:[...routes.values()]};
 }
